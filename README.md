@@ -1,2 +1,2 @@
-# edutec-tech-ops
+# edutech-technical-ops
 
