@@ -1,0 +1,13 @@
+{
+  "brand": "https://cdn.simpleicons.org/intel/0068B5",
+  "series": {
+    "i3": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRmSu5YHqh1Biz4w_P9keLL4vjjNeQVwKbtt1_KyHgr6A&s=10",
+    "i5": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRmSu5YHqh1Biz4w_P9keLL4vjjNeQVwKbtt1_KyHgr6A&s=10",
+    "i7": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRmSu5YHqh1Biz4w_P9keLL4vjjNeQVwKbtt1_KyHgr6A&s=10",
+    "i9": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRmSu5YHqh1Biz4w_P9keLL4vjjNeQVwKbtt1_KyHgr6A&s=10",
+    "Ultra 3": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRmSu5YHqh1Biz4w_P9keLL4vjjNeQVwKbtt1_KyHgr6A&s=10",
+    "Ultra 5": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRmSu5YHqh1Biz4w_P9keLL4vjjNeQVwKbtt1_KyHgr6A&s=10",
+    "Ultra 7": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRmSu5YHqh1Biz4w_P9keLL4vjjNeQVwKbtt1_KyHgr6A&s=10",
+    "Ultra 9": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRmSu5YHqh1Biz4w_P9keLL4vjjNeQVwKbtt1_KyHgr6A&s=10"
+  }
+}

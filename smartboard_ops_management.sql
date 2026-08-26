@@ -90,6 +90,7 @@ CREATE TABLE ops_models (
 -- =====================================================
 CREATE TABLE ram_specs (
     id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    brand       VARCHAR(100) NULL,
     ddr_version VARCHAR(10) NOT NULL,
     capacity_gb SMALLINT UNSIGNED NOT NULL,
     description VARCHAR(100) NULL,

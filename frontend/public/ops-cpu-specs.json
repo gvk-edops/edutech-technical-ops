@@ -1,0 +1,310 @@
+{
+  "processors": [
+    {
+      "model": "OPS i5-7500",
+      "generation": "7th Gen",
+      "series": "i5",
+      "core": "i5-7500",
+      "cores": 4,
+      "base_speed_ghz": 3.4,
+      "cache_mb": 6
+    },
+    {
+      "model": "OPS i7-7700",
+      "generation": "7th Gen",
+      "series": "i7",
+      "core": "i7-7700",
+      "cores": 4,
+      "base_speed_ghz": 3.6,
+      "cache_mb": 8
+    },
+    {
+      "model": "OPS i3-8100",
+      "generation": "8th Gen",
+      "series": "i3",
+      "core": "i3-8100",
+      "cores": 4,
+      "base_speed_ghz": 3.6,
+      "cache_mb": 6
+    },
+    {
+      "model": "OPS i5-8500",
+      "generation": "8th Gen",
+      "series": "i5",
+      "core": "i5-8500",
+      "cores": 6,
+      "base_speed_ghz": 3.0,
+      "cache_mb": 9
+    },
+    {
+      "model": "OPS i7-8700",
+      "generation": "8th Gen",
+      "series": "i7",
+      "core": "i7-8700",
+      "cores": 6,
+      "base_speed_ghz": 3.2,
+      "cache_mb": 12
+    },
+    {
+      "model": "OPS i3-9100",
+      "generation": "9th Gen",
+      "series": "i3",
+      "core": "i3-9100",
+      "cores": 4,
+      "base_speed_ghz": 3.6,
+      "cache_mb": 6
+    },
+    {
+      "model": "OPS i5-9500",
+      "generation": "9th Gen",
+      "series": "i5",
+      "core": "i5-9500",
+      "cores": 6,
+      "base_speed_ghz": 3.0,
+      "cache_mb": 9
+    },
+    {
+      "model": "OPS i7-9700",
+      "generation": "9th Gen",
+      "series": "i7",
+      "core": "i7-9700",
+      "cores": 8,
+      "base_speed_ghz": 3.0,
+      "cache_mb": 12
+    },
+    {
+      "model": "OPS i9-9900",
+      "generation": "9th Gen",
+      "series": "i9",
+      "core": "i9-9900",
+      "cores": 8,
+      "base_speed_ghz": 3.1,
+      "cache_mb": 16
+    },
+    {
+      "model": "OPS i3-10100",
+      "generation": "10th Gen",
+      "series": "i3",
+      "core": "i3-10100",
+      "cores": 4,
+      "base_speed_ghz": 3.6,
+      "cache_mb": 6
+    },
+    {
+      "model": "OPS i5-10400",
+      "generation": "10th Gen",
+      "series": "i5",
+      "core": "i5-10400",
+      "cores": 6,
+      "base_speed_ghz": 2.9,
+      "cache_mb": 12
+    },
+    {
+      "model": "OPS i7-10700",
+      "generation": "10th Gen",
+      "series": "i7",
+      "core": "i7-10700",
+      "cores": 8,
+      "base_speed_ghz": 2.9,
+      "cache_mb": 16
+    },
+    {
+      "model": "OPS i9-10900",
+      "generation": "10th Gen",
+      "series": "i9",
+      "core": "i9-10900",
+      "cores": 10,
+      "base_speed_ghz": 2.8,
+      "cache_mb": 20
+    },
+    {
+      "model": "OPS i3-1115G4",
+      "generation": "11th Gen",
+      "series": "i3",
+      "core": "i3-1115G4",
+      "cores": 2,
+      "base_speed_ghz": 3.0,
+      "cache_mb": 6
+    },
+    {
+      "model": "OPS i5-1135G7",
+      "generation": "11th Gen",
+      "series": "i5",
+      "core": "i5-1135G7",
+      "cores": 4,
+      "base_speed_ghz": 2.4,
+      "cache_mb": 8
+    },
+    {
+      "model": "OPS i7-1185G7",
+      "generation": "11th Gen",
+      "series": "i7",
+      "core": "i7-1185G7",
+      "cores": 4,
+      "base_speed_ghz": 3.0,
+      "cache_mb": 12
+    },
+    {
+      "model": "OPS i5-12400",
+      "generation": "12th Gen",
+      "series": "i5",
+      "core": "i5-12400",
+      "cores": 6,
+      "base_speed_ghz": 2.5,
+      "cache_mb": 18
+    },
+    {
+      "model": "OPS i7-12700",
+      "generation": "12th Gen",
+      "series": "i7",
+      "core": "i7-12700",
+      "cores": 12,
+      "base_speed_ghz": 2.1,
+      "cache_mb": 25
+    },
+    {
+      "model": "OPS i9-12900",
+      "generation": "12th Gen",
+      "series": "i9",
+      "core": "i9-12900",
+      "cores": 16,
+      "base_speed_ghz": 2.4,
+      "cache_mb": 30
+    },
+    {
+      "model": "OPS i3-13100",
+      "generation": "13th Gen",
+      "series": "i3",
+      "core": "i3-13100",
+      "cores": 4,
+      "base_speed_ghz": 3.4,
+      "cache_mb": 12
+    },
+    {
+      "model": "OPS i5-13400",
+      "generation": "13th Gen",
+      "series": "i5",
+      "core": "i5-13400",
+      "cores": 10,
+      "base_speed_ghz": 2.5,
+      "cache_mb": 20
+    },
+    {
+      "model": "OPS i7-13700",
+      "generation": "13th Gen",
+      "series": "i7",
+      "core": "i7-13700",
+      "cores": 16,
+      "base_speed_ghz": 2.1,
+      "cache_mb": 30
+    },
+    {
+      "model": "OPS i9-13900",
+      "generation": "13th Gen",
+      "series": "i9",
+      "core": "i9-13900",
+      "cores": 24,
+      "base_speed_ghz": 2.0,
+      "cache_mb": 36
+    },
+    {
+      "model": "OPS i3-14100",
+      "generation": "14th Gen",
+      "series": "i3",
+      "core": "i3-14100",
+      "cores": 4,
+      "base_speed_ghz": 3.5,
+      "cache_mb": 12
+    },
+    {
+      "model": "OPS i5-14400",
+      "generation": "14th Gen",
+      "series": "i5",
+      "core": "i5-14400",
+      "cores": 10,
+      "base_speed_ghz": 2.5,
+      "cache_mb": 20
+    },
+    {
+      "model": "OPS i7-14700",
+      "generation": "14th Gen",
+      "series": "i7",
+      "core": "i7-14700",
+      "cores": 20,
+      "base_speed_ghz": 2.1,
+      "cache_mb": 33
+    },
+    {
+      "model": "OPS i9-14900",
+      "generation": "14th Gen",
+      "series": "i9",
+      "core": "i9-14900",
+      "cores": 24,
+      "base_speed_ghz": 2.0,
+      "cache_mb": 36
+    },
+    {
+      "model": "OPS Ultra 5 125H",
+      "generation": "Core Ultra Series 1",
+      "series": "Ultra 5",
+      "core": "Ultra 5 125H",
+      "cores": 14,
+      "base_speed_ghz": 1.2,
+      "cache_mb": 18
+    },
+    {
+      "model": "OPS Ultra 7 155H",
+      "generation": "Core Ultra Series 1",
+      "series": "Ultra 7",
+      "core": "Ultra 7 155H",
+      "cores": 16,
+      "base_speed_ghz": 1.4,
+      "cache_mb": 24
+    },
+    {
+      "model": "OPS Ultra 9 185H",
+      "generation": "Core Ultra Series 1",
+      "series": "Ultra 9",
+      "core": "Ultra 9 185H",
+      "cores": 16,
+      "base_speed_ghz": 2.3,
+      "cache_mb": 24
+    },
+    {
+      "model": "OPS Ultra 5 225H",
+      "generation": "Core Ultra Series 2",
+      "series": "Ultra 5",
+      "core": "Ultra 5 225H",
+      "cores": 14,
+      "base_speed_ghz": 2.0,
+      "cache_mb": 28
+    },
+    {
+      "model": "OPS Ultra 7 258V",
+      "generation": "Core Ultra Series 2",
+      "series": "Ultra 7",
+      "core": "Ultra 7 258V",
+      "cores": 8,
+      "base_speed_ghz": 2.2,
+      "cache_mb": 12
+    },
+    {
+      "model": "OPS Ultra 7 265H",
+      "generation": "Core Ultra Series 2",
+      "series": "Ultra 7",
+      "core": "Ultra 7 265H",
+      "cores": 16,
+      "base_speed_ghz": 2.4,
+      "cache_mb": 24
+    },
+    {
+      "model": "OPS Ultra 9 285H",
+      "generation": "Core Ultra Series 2",
+      "series": "Ultra 9",
+      "core": "Ultra 9 285H",
+      "cores": 16,
+      "base_speed_ghz": 2.7,
+      "cache_mb": 24
+    }
+  ]
+}
