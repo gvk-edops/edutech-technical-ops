@@ -66,14 +66,25 @@ async function autoInitialize() {
   if (cnt > 0) {
     console.log("✅ Database already initialised, skipping schema import");
     try {
-      await conn.query(
-        "ALTER TABLE ram_specs ADD COLUMN brand VARCHAR(100) NULL AFTER id",
-      );
-      console.log("✅ Added RAM brand column");
+      await conn.query("ALTER TABLE ram_specs DROP COLUMN brand");
+      console.log("✅ Removed RAM brand column");
     } catch (err) {
-      if (!err.message.includes("Duplicate column name")) throw err;
+      if (!err.message.includes("Can't DROP")) throw err;
     }
     await seedLocations(conn);
+    await conn.query(
+      "ALTER TABLE jobs MODIFY job_type ENUM('smartboard','ops','both') NOT NULL DEFAULT 'both'",
+    );
+    await conn.query(
+      "ALTER TABLE jobs MODIFY smartboard_model_id INT UNSIGNED NULL",
+    );
+    await conn.query("ALTER TABLE jobs MODIFY ops_model_id INT UNSIGNED NULL");
+    await conn.query(
+      "ALTER TABLE jobs MODIFY ram_ddr_version VARCHAR(10) NULL",
+    );
+    await conn.query(
+      "ALTER TABLE jobs MODIFY ram_capacity_gb SMALLINT UNSIGNED NULL",
+    );
     await conn.end();
     return;
   }
@@ -109,6 +120,17 @@ async function autoInitialize() {
 
   console.log("✅ Database schema initialised successfully");
   await seedLocations(conn);
+  try {
+    await conn.query(
+      "ALTER TABLE jobs ADD COLUMN job_type ENUM('new','service') NOT NULL DEFAULT 'new' AFTER job_number",
+    );
+    console.log("✅ Added job type column");
+  } catch (err) {
+    if (!err.message.includes("Duplicate column name")) throw err;
+  }
+  await conn.query(
+    "ALTER TABLE jobs MODIFY smartboard_model_id INT UNSIGNED NULL",
+  );
   await conn.end();
 }
 

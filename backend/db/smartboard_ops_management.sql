@@ -90,7 +90,6 @@ CREATE TABLE ops_models (
 -- =====================================================
 CREATE TABLE ram_specs (
     id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    brand       VARCHAR(100) NULL,
     ddr_version VARCHAR(10) NOT NULL,
     capacity_gb SMALLINT UNSIGNED NOT NULL,
     description VARCHAR(100) NULL,
@@ -246,13 +245,14 @@ CREATE TABLE main_software_keys (
 CREATE TABLE jobs (
     id                      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     job_number              VARCHAR(50) NOT NULL UNIQUE,
+    job_type                ENUM('smartboard','ops','both') NOT NULL DEFAULT 'both',
     client_id               INT UNSIGNED NOT NULL,
     district_id             TINYINT UNSIGNED NOT NULL,
-    smartboard_model_id     INT UNSIGNED NOT NULL,
+    smartboard_model_id     INT UNSIGNED NULL,
     smartboard_count        INT UNSIGNED NOT NULL DEFAULT 1,
-    ops_model_id            INT UNSIGNED NOT NULL,
-    ram_ddr_version         VARCHAR(10) NOT NULL,
-    ram_capacity_gb         SMALLINT UNSIGNED NOT NULL,   -- total required RAM, e.g., 16
+    ops_model_id            INT UNSIGNED NULL,
+    ram_ddr_version         VARCHAR(10) NULL,
+    ram_capacity_gb         SMALLINT UNSIGNED NULL,   -- total required RAM, e.g., 16
     status                  ENUM('created','assembly_in_progress','ready_for_delivery','completed','cancelled') NOT NULL DEFAULT 'created',
     created_by              INT UNSIGNED NOT NULL,
     created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

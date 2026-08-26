@@ -1,5 +1,11 @@
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Settings, Zap, Users } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  LayoutDashboard,
+  Settings,
+  Zap,
+  Users,
+} from "lucide-react";
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
@@ -19,6 +25,7 @@ import { API_URL } from "@/lib/api";
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/app/dashboard" },
   { icon: Users, label: "Clients", href: "/app/clients" },
+  { icon: BriefcaseBusiness, label: "Jobs", href: "/app/jobs" },
   // TODO: add as sections are implemented
   // { icon: Briefcase,       label: 'Jobs',       href: '/app/jobs' },
   // { icon: Wrench,          label: 'Assembly',   href: '/app/assembly' },

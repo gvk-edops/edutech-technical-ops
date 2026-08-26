@@ -868,13 +868,11 @@ export default function SystemConfiguration() {
             title="RAM Specifications"
             description="DDR version and capacity combinations"
             columns={[
-              { key: "brand", label: "Brand" },
               { key: "ddr_version", label: "DDR Version" },
               { key: "capacity_gb", label: "Capacity (GB)" },
               { key: "description", label: "Description" },
             ]}
             fields={[
-              { key: "brand", label: "Brand" },
               {
                 key: "ddr_version",
                 label: "DDR Version (e.g. DDR4)",

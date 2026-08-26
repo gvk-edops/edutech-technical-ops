@@ -38,11 +38,13 @@ autoInitialize()
     const { default: catalogsRouter } =
       await import("./routers/catalogs.route.js");
     const { default: clientRouter } = await import("./routers/client.route.js");
+    const { default: jobRouter } = await import("./routers/job.route.js");
 
     app.use("/auth", authRouter);
     app.use("/settings", settingsRouter);
     app.use("/catalogs", catalogsRouter);
     app.use("/clients", clientRouter);
+    app.use("/jobs", jobRouter);
 
     // TODO: mount as implemented
     // app.use('/clients',       clientsRouter);

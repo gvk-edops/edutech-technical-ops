@@ -44,18 +44,12 @@ const CATALOGS = {
   "ram-specs": {
     table: "ram_specs",
     insert: (b) => [
-      "INSERT INTO ram_specs (brand, ddr_version, capacity_gb, description) VALUES (?,?,?,?)",
-      [b.brand || null, b.ddr_version, b.capacity_gb, b.description || null],
+      "INSERT INTO ram_specs (ddr_version, capacity_gb, description) VALUES (?,?,?)",
+      [b.ddr_version, b.capacity_gb, b.description || null],
     ],
     update: (b, id) => [
-      "UPDATE ram_specs SET brand=?, ddr_version=?, capacity_gb=?, description=? WHERE id=?",
-      [
-        b.brand || null,
-        b.ddr_version,
-        b.capacity_gb,
-        b.description || null,
-        id,
-      ],
+      "UPDATE ram_specs SET ddr_version=?, capacity_gb=?, description=? WHERE id=?",
+      [b.ddr_version, b.capacity_gb, b.description || null, id],
     ],
   },
   "storage-specs": {

@@ -6,6 +6,7 @@ import Dashboard from "./components/Dashboard";
 import SettingsHub from "./components/settings/SettingsHub";
 import SettingsRouter from "./components/settings/SettingsRouter";
 import Clients from "./components/Clients";
+import Jobs from "./components/Jobs";
 
 function App() {
   return (
@@ -19,13 +20,13 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="settings/*" element={<SettingsRouter />} />
           <Route path="clients" element={<Clients />} />
+          <Route path="jobs" element={<Jobs />} />
 
           {/* TODO: add as implemented */}
           {/* <Route path="users"          element={<Users />} /> */}
           {/* <Route path="catalogs/*"     element={<Catalogs />} /> */}
           {/* <Route path="inventory/*"    element={<Inventory />} /> */}
           {/* <Route path="software-keys"  element={<SoftwareKeys />} /> */}
-          {/* <Route path="jobs"           element={<Jobs />} /> */}
           {/* <Route path="jobs/:id/assembly" element={<AssemblyWizard />} /> */}
           {/* <Route path="repairs"        element={<Repairs />} /> */}
           {/* <Route path="reports"        element={<Reports />} /> */}
