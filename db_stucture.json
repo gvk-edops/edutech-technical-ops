@@ -1,0 +1,448 @@
+{
+  "database": "smartboard_ops_management",
+  "description": "Schema for managing smartboard OPS assembly, inventory, jobs, repairs, and software keys.",
+  "tables": [
+    {
+      "name": "users",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "username", "type": "VARCHAR(50)", "nullable": false, "unique": true },
+        { "name": "password_hash", "type": "VARCHAR(255)", "nullable": false },
+        { "name": "full_name", "type": "VARCHAR(100)", "nullable": false },
+        { "name": "email", "type": "VARCHAR(100)", "nullable": true },
+        { "name": "role", "type": "ENUM('admin','manager','technician')", "nullable": false, "default": "technician" },
+        { "name": "is_active", "type": "TINYINT(1)", "nullable": false, "default": 1 },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "provinces",
+      "columns": [
+        { "name": "id", "type": "TINYINT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "name", "type": "VARCHAR(50)", "nullable": false, "unique": true }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "districts",
+      "columns": [
+        { "name": "id", "type": "TINYINT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "name", "type": "VARCHAR(50)", "nullable": false },
+        { "name": "province_id", "type": "TINYINT UNSIGNED", "nullable": false, "foreign_key": { "table": "provinces", "column": "id" } }
+      ],
+      "indexes": [
+        { "name": "uq_district_name_province", "columns": ["name", "province_id"], "unique": true }
+      ]
+    },
+    {
+      "name": "clients",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "name", "type": "VARCHAR(150)", "nullable": false },
+        { "name": "address", "type": "TEXT", "nullable": true },
+        { "name": "district_id", "type": "TINYINT UNSIGNED", "nullable": false, "foreign_key": { "table": "districts", "column": "id" } },
+        { "name": "contact_person", "type": "VARCHAR(100)", "nullable": true },
+        { "name": "phone", "type": "VARCHAR(20)", "nullable": true },
+        { "name": "email", "type": "VARCHAR(100)", "nullable": true },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "smartboard_models",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "model_name", "type": "VARCHAR(100)", "nullable": false, "unique": true },
+        { "name": "brand", "type": "VARCHAR(50)", "nullable": true },
+        { "name": "description", "type": "TEXT", "nullable": true },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "ops_models",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "model_name", "type": "VARCHAR(100)", "nullable": false, "unique": true },
+        { "name": "processor_series", "type": "ENUM('i','ultra')", "nullable": false },
+        { "name": "processor_core", "type": "VARCHAR(20)", "nullable": false },
+        { "name": "processor_count", "type": "TINYINT UNSIGNED", "nullable": true },
+        { "name": "base_speed_ghz", "type": "DECIMAL(4,2)", "nullable": true },
+        { "name": "cache_mb", "type": "DECIMAL(5,1)", "nullable": true },
+        { "name": "description", "type": "TEXT", "nullable": true },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "ram_specs",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "ddr_version", "type": "VARCHAR(10)", "nullable": false },
+        { "name": "capacity_gb", "type": "SMALLINT UNSIGNED", "nullable": false },
+        { "name": "description", "type": "VARCHAR(100)", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "uq_ram_spec", "columns": ["ddr_version", "capacity_gb"], "unique": true }
+      ]
+    },
+    {
+      "name": "storage_specs",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "form_factor", "type": "VARCHAR(50)", "nullable": false },
+        { "name": "interface", "type": "VARCHAR(20)", "nullable": false },
+        { "name": "storage_type", "type": "ENUM('SSD','HDD')", "nullable": false },
+        { "name": "capacity_gb", "type": "INT UNSIGNED", "nullable": false },
+        { "name": "description", "type": "VARCHAR(100)", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "uq_storage_spec", "columns": ["form_factor", "interface", "storage_type", "capacity_gb"], "unique": true }
+      ]
+    },
+    {
+      "name": "network_card_models",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "model_name", "type": "VARCHAR(100)", "nullable": false, "unique": true },
+        { "name": "description", "type": "VARCHAR(150)", "nullable": true },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "main_software_catalog",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "software_type", "type": "ENUM('windows','office','iq_whiteboard','antivirus')", "nullable": false },
+        { "name": "name", "type": "VARCHAR(100)", "nullable": false },
+        { "name": "version", "type": "VARCHAR(50)", "nullable": true },
+        { "name": "description", "type": "TEXT", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "uq_main_sw", "columns": ["software_type", "name", "version"], "unique": true }
+      ]
+    },
+    {
+      "name": "additional_software_catalog",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "name", "type": "VARCHAR(100)", "nullable": false },
+        { "name": "version", "type": "VARCHAR(50)", "nullable": true },
+        { "name": "description", "type": "TEXT", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "uq_add_sw", "columns": ["name", "version"], "unique": true }
+      ]
+    },
+    {
+      "name": "inventory_batches",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "batch_type", "type": "ENUM('ops','ram','storage','network_card')", "nullable": false },
+        { "name": "description", "type": "VARCHAR(255)", "nullable": true },
+        { "name": "created_by", "type": "INT UNSIGNED", "nullable": true, "foreign_key": { "table": "users", "column": "id" } },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "inventory_ops",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "serial_number", "type": "VARCHAR(100)", "nullable": false, "unique": true },
+        { "name": "motherboard_serial", "type": "VARCHAR(100)", "nullable": false, "unique": true },
+        { "name": "ops_model_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "ops_models", "column": "id" } },
+        { "name": "status", "type": "ENUM('in_stock','assigned','faulty','retired','reserved')", "nullable": false, "default": "in_stock" },
+        { "name": "batch_id", "type": "INT UNSIGNED", "nullable": true, "foreign_key": { "table": "inventory_batches", "column": "id" } },
+        { "name": "notes", "type": "TEXT", "nullable": true },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": [
+        { "name": "idx_inventory_ops_status", "columns": ["status"] }
+      ]
+    },
+    {
+      "name": "inventory_rams",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "serial_number", "type": "VARCHAR(100)", "nullable": false, "unique": true },
+        { "name": "brand", "type": "VARCHAR(50)", "nullable": true },
+        { "name": "ram_spec_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "ram_specs", "column": "id" } },
+        { "name": "status", "type": "ENUM('in_stock','assigned','faulty','retired','reserved')", "nullable": false, "default": "in_stock" },
+        { "name": "batch_id", "type": "INT UNSIGNED", "nullable": true, "foreign_key": { "table": "inventory_batches", "column": "id" } },
+        { "name": "notes", "type": "TEXT", "nullable": true },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": [
+        { "name": "idx_inventory_rams_status", "columns": ["status"] }
+      ]
+    },
+    {
+      "name": "inventory_storage",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "serial_number", "type": "VARCHAR(100)", "nullable": false, "unique": true },
+        { "name": "brand", "type": "VARCHAR(50)", "nullable": true },
+        { "name": "storage_spec_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "storage_specs", "column": "id" } },
+        { "name": "status", "type": "ENUM('in_stock','assigned','faulty','retired','reserved')", "nullable": false, "default": "in_stock" },
+        { "name": "batch_id", "type": "INT UNSIGNED", "nullable": true, "foreign_key": { "table": "inventory_batches", "column": "id" } },
+        { "name": "notes", "type": "TEXT", "nullable": true },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": [
+        { "name": "idx_inventory_storage_status", "columns": ["status"] }
+      ]
+    },
+    {
+      "name": "inventory_network_cards",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "serial_number", "type": "VARCHAR(100)", "nullable": false, "unique": true },
+        { "name": "model_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "network_card_models", "column": "id" } },
+        { "name": "status", "type": "ENUM('in_stock','assigned','faulty','retired','reserved')", "nullable": false, "default": "in_stock" },
+        { "name": "batch_id", "type": "INT UNSIGNED", "nullable": true, "foreign_key": { "table": "inventory_batches", "column": "id" } },
+        { "name": "notes", "type": "TEXT", "nullable": true },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": [
+        { "name": "idx_inventory_net_status", "columns": ["status"] }
+      ]
+    },
+    {
+      "name": "main_software_keys",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "software_catalog_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "main_software_catalog", "column": "id" } },
+        { "name": "license_key", "type": "VARCHAR(255)", "nullable": false, "unique": true },
+        { "name": "license_type", "type": "ENUM('lifetime','subscription')", "nullable": false, "default": "lifetime" },
+        { "name": "subscription_start_date", "type": "DATE", "nullable": true },
+        { "name": "subscription_end_date", "type": "DATE", "nullable": true },
+        { "name": "status", "type": "ENUM('purchased','assigned','revoked','expired')", "nullable": false, "default": "purchased" },
+        { "name": "notes", "type": "TEXT", "nullable": true },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "jobs",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "job_number", "type": "VARCHAR(50)", "nullable": false, "unique": true },
+        { "name": "client_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "clients", "column": "id" } },
+        { "name": "district_id", "type": "TINYINT UNSIGNED", "nullable": false, "foreign_key": { "table": "districts", "column": "id" } },
+        { "name": "smartboard_model_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "smartboard_models", "column": "id" } },
+        { "name": "smartboard_count", "type": "INT UNSIGNED", "nullable": false, "default": 1 },
+        { "name": "ops_model_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "ops_models", "column": "id" } },
+        { "name": "ram_ddr_version", "type": "VARCHAR(10)", "nullable": false },
+        { "name": "ram_capacity_gb", "type": "SMALLINT UNSIGNED", "nullable": false },
+        { "name": "status", "type": "ENUM('created','assembly_in_progress','ready_for_delivery','completed','cancelled')", "nullable": false, "default": "created" },
+        { "name": "created_by", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "users", "column": "id" } },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": [
+        { "name": "idx_jobs_client_date", "columns": ["client_id", "created_at"] },
+        { "name": "idx_jobs_district_date", "columns": ["district_id", "created_at"] }
+      ]
+    },
+    {
+      "name": "job_storage_requirements",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "job_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "jobs", "column": "id" } },
+        { "name": "storage_spec_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "storage_specs", "column": "id" } },
+        { "name": "role", "type": "ENUM('primary','secondary','tertiary','additional')", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "uq_job_storage_role", "columns": ["job_id", "role"], "unique": true }
+      ]
+    },
+    {
+      "name": "job_main_software_requirements",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "job_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "jobs", "column": "id" } },
+        { "name": "software_catalog_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "main_software_catalog", "column": "id" } }
+      ],
+      "indexes": [
+        { "name": "uq_job_main_sw", "columns": ["job_id", "software_catalog_id"], "unique": true }
+      ]
+    },
+    {
+      "name": "job_additional_software",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "job_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "jobs", "column": "id" } },
+        { "name": "software_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "additional_software_catalog", "column": "id" } }
+      ],
+      "indexes": [
+        { "name": "uq_job_add_sw", "columns": ["job_id", "software_id"], "unique": true }
+      ]
+    },
+    {
+      "name": "assembled_units",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "job_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "jobs", "column": "id" } },
+        { "name": "ops_inventory_id", "type": "INT UNSIGNED", "nullable": false, "unique": true, "foreign_key": { "table": "inventory_ops", "column": "id" } },
+        { "name": "wifi_card_inventory_id", "type": "INT UNSIGNED", "nullable": true, "foreign_key": { "table": "inventory_network_cards", "column": "id" } },
+        { "name": "technician_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "users", "column": "id" } },
+        { "name": "notes", "type": "TEXT", "nullable": true },
+        { "name": "status", "type": "ENUM('assembly_in_progress','assembled','ready_for_delivery','delivered','in_repair','returned','retired')", "nullable": false, "default": "assembly_in_progress" },
+        { "name": "assembly_started_at", "type": "DATETIME", "nullable": true },
+        { "name": "assembly_completed_at", "type": "DATETIME", "nullable": true },
+        { "name": "ready_for_delivery_at", "type": "DATETIME", "nullable": true },
+        { "name": "delivered_at", "type": "DATETIME", "nullable": true },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": [
+        { "name": "idx_assembled_status", "columns": ["status"] },
+        { "name": "idx_assembled_dates", "columns": ["assembly_completed_at", "delivered_at"] }
+      ]
+    },
+    {
+      "name": "assembly_rams",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "assembled_unit_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "assembled_units", "column": "id" } },
+        { "name": "ram_inventory_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "inventory_rams", "column": "id" } }
+      ],
+      "indexes": [
+        { "name": "uq_asm_ram", "columns": ["assembled_unit_id", "ram_inventory_id"], "unique": true }
+      ]
+    },
+    {
+      "name": "assembly_storage",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "assembled_unit_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "assembled_units", "column": "id" } },
+        { "name": "storage_inventory_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "inventory_storage", "column": "id" } },
+        { "name": "role", "type": "ENUM('primary','secondary','tertiary','additional')", "nullable": false, "default": "additional" },
+        { "name": "notes", "type": "TEXT", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "uq_asm_storage", "columns": ["assembled_unit_id", "storage_inventory_id"], "unique": true }
+      ]
+    },
+    {
+      "name": "assembly_main_software",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "assembled_unit_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "assembled_units", "column": "id" } },
+        { "name": "software_catalog_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "main_software_catalog", "column": "id" } },
+        { "name": "software_key_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "main_software_keys", "column": "id" } },
+        { "name": "is_active", "type": "TINYINT(1)", "nullable": false, "default": 1 },
+        { "name": "assigned_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "unassigned_at", "type": "DATETIME", "nullable": true },
+        { "name": "notes", "type": "TEXT", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "uq_asm_main_sw_active", "columns": ["assembled_unit_id", "software_catalog_id", "is_active"], "unique": true },
+        { "name": "idx_assembly_main_sw_unit", "columns": ["assembled_unit_id", "is_active"] }
+      ]
+    },
+    {
+      "name": "assembly_additional_software",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "assembled_unit_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "assembled_units", "column": "id" } },
+        { "name": "software_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "additional_software_catalog", "column": "id" } },
+        { "name": "installed_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" }
+      ],
+      "indexes": [
+        { "name": "uq_asm_add_sw", "columns": ["assembled_unit_id", "software_id"], "unique": true }
+      ]
+    },
+    {
+      "name": "repair_jobs",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "repair_number", "type": "VARCHAR(50)", "nullable": false, "unique": true },
+        { "name": "assembled_unit_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "assembled_units", "column": "id" } },
+        { "name": "client_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "clients", "column": "id" } },
+        { "name": "reported_issue", "type": "TEXT", "nullable": false },
+        { "name": "status", "type": "ENUM('open','in_progress','completed','closed')", "nullable": false, "default": "open" },
+        { "name": "technician_id", "type": "INT UNSIGNED", "nullable": true, "foreign_key": { "table": "users", "column": "id" } },
+        { "name": "start_date", "type": "DATE", "nullable": true },
+        { "name": "end_date", "type": "DATE", "nullable": true },
+        { "name": "notes", "type": "TEXT", "nullable": true },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "updated_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      ],
+      "indexes": [
+        { "name": "idx_repair_status_date", "columns": ["status", "created_at"] }
+      ]
+    },
+    {
+      "name": "repair_component_replacements",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "repair_job_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "repair_jobs", "column": "id" } },
+        { "name": "component_type", "type": "ENUM('ops','ram','storage','wifi_card','software_key')", "nullable": false },
+        { "name": "old_inventory_id", "type": "INT UNSIGNED", "nullable": true },
+        { "name": "new_inventory_id", "type": "INT UNSIGNED", "nullable": true },
+        { "name": "replacement_date", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "technician_id", "type": "INT UNSIGNED", "nullable": true, "foreign_key": { "table": "users", "column": "id" } },
+        { "name": "notes", "type": "TEXT", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "idx_rep_replace_type", "columns": ["component_type"] },
+        { "name": "idx_rep_replace_old", "columns": ["old_inventory_id"] },
+        { "name": "idx_rep_replace_new", "columns": ["new_inventory_id"] }
+      ]
+    },
+    {
+      "name": "ops_replacements",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "original_assembled_unit_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "assembled_units", "column": "id" } },
+        { "name": "replacement_ops_inventory_id", "type": "INT UNSIGNED", "nullable": false, "foreign_key": { "table": "inventory_ops", "column": "id" } },
+        { "name": "reason", "type": "VARCHAR(255)", "nullable": true },
+        { "name": "assigned_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        { "name": "returned_at", "type": "DATETIME", "nullable": true },
+        { "name": "status", "type": "ENUM('assigned','returned','permanent')", "nullable": false, "default": "assigned" },
+        { "name": "technician_id", "type": "INT UNSIGNED", "nullable": true, "foreign_key": { "table": "users", "column": "id" } },
+        { "name": "notes", "type": "TEXT", "nullable": true }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "audit_logs",
+      "columns": [
+        { "name": "id", "type": "INT UNSIGNED", "nullable": false, "auto_increment": true, "primary_key": true },
+        { "name": "user_id", "type": "INT UNSIGNED", "nullable": true, "foreign_key": { "table": "users", "column": "id" } },
+        { "name": "action", "type": "VARCHAR(100)", "nullable": false },
+        { "name": "entity_type", "type": "VARCHAR(50)", "nullable": true },
+        { "name": "entity_id", "type": "INT UNSIGNED", "nullable": true },
+        { "name": "details", "type": "TEXT", "nullable": true },
+        { "name": "ip_address", "type": "VARCHAR(45)", "nullable": true },
+        { "name": "created_at", "type": "DATETIME", "nullable": false, "default": "CURRENT_TIMESTAMP" }
+      ],
+      "indexes": [
+        { "name": "idx_audit_created_at", "columns": ["created_at"] }
+      ]
+    }
+  ],
+  "triggers": [
+    { "name": "trg_assembly_rams_insert", "event": "AFTER INSERT", "table": "assembly_rams", "action": "UPDATE inventory_rams SET status='assigned' WHERE id=NEW.ram_inventory_id" },
+    { "name": "trg_assembly_rams_delete", "event": "AFTER DELETE", "table": "assembly_rams", "action": "UPDATE inventory_rams SET status='in_stock' WHERE id=OLD.ram_inventory_id" },
+    { "name": "trg_assembly_storage_insert", "event": "AFTER INSERT", "table": "assembly_storage", "action": "UPDATE inventory_storage SET status='assigned' WHERE id=NEW.storage_inventory_id" },
+    { "name": "trg_assembly_storage_delete", "event": "AFTER DELETE", "table": "assembly_storage", "action": "UPDATE inventory_storage SET status='in_stock' WHERE id=OLD.storage_inventory_id" },
+    { "name": "trg_assembly_main_software_insert", "event": "AFTER INSERT", "table": "assembly_main_software", "action": "UPDATE main_software_keys SET status='assigned' WHERE id=NEW.software_key_id" },
+    { "name": "trg_assembly_main_software_update", "event": "AFTER UPDATE", "table": "assembly_main_software", "action": "IF NEW.is_active=0 AND OLD.is_active=1 THEN UPDATE main_software_keys SET status='available' WHERE id=OLD.software_key_id; END IF" },
+    { "name": "trg_repair_component_replacements_insert", "event": "AFTER INSERT", "table": "repair_component_replacements", "action": "Set old component to faulty/revoked, new to assigned" }
+  ]
+}
