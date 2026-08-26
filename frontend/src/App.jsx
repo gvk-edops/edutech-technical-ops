@@ -1,10 +1,11 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'sonner';
-import Login from './components/Login';
-import DashboardLayout from './pages/DashboardLayout';
-import Dashboard from './components/Dashboard';
-import SettingsHub from './components/settings/SettingsHub';
-import SettingsRouter from './components/settings/SettingsRouter';
+import { Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "sonner";
+import Login from "./components/Login";
+import DashboardLayout from "./pages/DashboardLayout";
+import Dashboard from "./components/Dashboard";
+import SettingsHub from "./components/settings/SettingsHub";
+import SettingsRouter from "./components/settings/SettingsRouter";
+import Clients from "./components/Clients";
 
 function App() {
   return (
@@ -17,11 +18,11 @@ function App() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="settings/*" element={<SettingsRouter />} />
+          <Route path="clients" element={<Clients />} />
 
           {/* TODO: add as implemented */}
           {/* <Route path="users"          element={<Users />} /> */}
           {/* <Route path="catalogs/*"     element={<Catalogs />} /> */}
-          {/* <Route path="clients"        element={<Clients />} /> */}
           {/* <Route path="inventory/*"    element={<Inventory />} /> */}
           {/* <Route path="software-keys"  element={<SoftwareKeys />} /> */}
           {/* <Route path="jobs"           element={<Jobs />} /> */}

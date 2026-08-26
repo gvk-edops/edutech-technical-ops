@@ -8,6 +8,39 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+async function seedLocations(conn) {
+  const locationsPath = path.join(
+    __dirname,
+    "../../frontend/public/districts.json",
+  );
+  if (!fs.existsSync(locationsPath)) return;
+
+  const locations = JSON.parse(fs.readFileSync(locationsPath, "utf8"));
+  const provinces = [
+    ...new Set(locations.map((location) => location.province)),
+  ];
+
+  for (const [index, province] of provinces.entries()) {
+    await conn.query("INSERT IGNORE INTO provinces (id, name) VALUES (?, ?)", [
+      index + 1,
+      province,
+    ]);
+  }
+
+  for (const location of locations) {
+    const [[province]] = await conn.query(
+      "SELECT id FROM provinces WHERE name = ?",
+      [location.province],
+    );
+    if (province) {
+      await conn.query(
+        "INSERT IGNORE INTO districts (id, name, province_id) VALUES (?, ?, ?)",
+        [location.id, location.name, province.id],
+      );
+    }
+  }
+}
+
 async function autoInitialize() {
   const dbName = process.env.DB_NAME || "smartboard_ops_management";
 
@@ -40,6 +73,7 @@ async function autoInitialize() {
     } catch (err) {
       if (!err.message.includes("Duplicate column name")) throw err;
     }
+    await seedLocations(conn);
     await conn.end();
     return;
   }
@@ -74,6 +108,7 @@ async function autoInitialize() {
   }
 
   console.log("✅ Database schema initialised successfully");
+  await seedLocations(conn);
   await conn.end();
 }
 
