@@ -251,3 +251,93 @@ export const getSummary = async (req, res) => {
     res.status(500).json({ Status: false, Error: err.message });
   }
 };
+
+// ── GET /inventory/tree-summary ─────────────────────────────────────────────
+
+export const getTreeSummary = async (req, res) => {
+  try {
+    const [[ops], [ram], [storage], [network]] = await Promise.all([
+      pool.query(
+        `SELECT s.id AS spec_id, s.model_name,
+          SUM(i.status='in_stock') AS in_stock, SUM(i.status='assigned') AS assigned,
+          SUM(i.status='reserved') AS reserved, SUM(i.status='faulty') AS faulty,
+          SUM(i.status='retired') AS retired, COUNT(*) AS total
+         FROM inventory_ops i JOIN ops_models s ON s.id=i.ops_model_id
+         GROUP BY s.id ORDER BY s.model_name`
+      ),
+      pool.query(
+        `SELECT s.id AS spec_id, s.ddr_version, s.capacity_gb,
+          SUM(i.status='in_stock') AS in_stock, SUM(i.status='assigned') AS assigned,
+          SUM(i.status='reserved') AS reserved, SUM(i.status='faulty') AS faulty,
+          SUM(i.status='retired') AS retired, COUNT(*) AS total
+         FROM inventory_rams i JOIN ram_specs s ON s.id=i.ram_spec_id
+         GROUP BY s.id ORDER BY s.ddr_version, s.capacity_gb`
+      ),
+      pool.query(
+        `SELECT s.id AS spec_id, s.storage_type, s.interface, s.form_factor, s.capacity_gb,
+          SUM(i.status='in_stock') AS in_stock, SUM(i.status='assigned') AS assigned,
+          SUM(i.status='reserved') AS reserved, SUM(i.status='faulty') AS faulty,
+          SUM(i.status='retired') AS retired, COUNT(*) AS total
+         FROM inventory_storage i JOIN storage_specs s ON s.id=i.storage_spec_id
+         GROUP BY s.id ORDER BY s.storage_type, s.interface, s.form_factor, s.capacity_gb`
+      ),
+      pool.query(
+        `SELECT s.id AS spec_id, s.model_name,
+          SUM(i.status='in_stock') AS in_stock, SUM(i.status='assigned') AS assigned,
+          SUM(i.status='reserved') AS reserved, SUM(i.status='faulty') AS faulty,
+          SUM(i.status='retired') AS retired, COUNT(*) AS total
+         FROM inventory_network_cards i JOIN network_card_models s ON s.id=i.model_id
+         GROUP BY s.id ORDER BY s.model_name`
+      ),
+    ]);
+    res.json({ Status: true, data: { ops, ram, storage, network_card: network } });
+  } catch (err) {
+    res.status(500).json({ Status: false, Error: err.message });
+  }
+};
+
+// ── GET /inventory/:type/spec-summary ─────────────────────────────────────────
+
+export const getSpecSummary = async (req, res) => {
+  const type = req.params.type;
+  const t = TABLES[type];
+  if (!t) return res.status(404).json({ Status: false, Error: "Unknown type" });
+
+  try {
+    let specJoin, specCols, groupCol;
+    if (type === "ram") {
+      specJoin = "JOIN ram_specs s ON s.id = i.ram_spec_id";
+      specCols = "s.id AS spec_id, s.ddr_version, s.capacity_gb, s.bus_speed_mhz, NULL AS storage_type, NULL AS form_factor, NULL AS interface, NULL AS model_name, NULL AS processor_core";
+      groupCol = "s.id";
+    } else if (type === "storage") {
+      specJoin = "JOIN storage_specs s ON s.id = i.storage_spec_id";
+      specCols = "s.id AS spec_id, NULL AS ddr_version, s.capacity_gb, NULL AS bus_speed_mhz, s.storage_type, s.form_factor, s.interface, NULL AS model_name, NULL AS processor_core";
+      groupCol = "s.id";
+    } else if (type === "ops") {
+      specJoin = "JOIN ops_models s ON s.id = i.ops_model_id";
+      specCols = "s.id AS spec_id, NULL AS ddr_version, NULL AS capacity_gb, NULL AS bus_speed_mhz, NULL AS storage_type, NULL AS form_factor, NULL AS interface, s.model_name, s.processor_core";
+      groupCol = "s.id";
+    } else {
+      specJoin = "JOIN network_card_models s ON s.id = i.model_id";
+      specCols = "s.id AS spec_id, NULL AS ddr_version, NULL AS capacity_gb, NULL AS bus_speed_mhz, NULL AS storage_type, NULL AS form_factor, NULL AS interface, s.model_name, NULL AS processor_core";
+      groupCol = "s.id";
+    }
+
+    const [rows] = await pool.query(
+      `SELECT ${specCols},
+        SUM(i.status = 'in_stock')  AS in_stock,
+        SUM(i.status = 'assigned')  AS assigned,
+        SUM(i.status = 'reserved')  AS reserved,
+        SUM(i.status = 'faulty')    AS faulty,
+        SUM(i.status = 'retired')   AS retired,
+        COUNT(*)                    AS total
+       FROM ${t.inv} i
+       ${specJoin}
+       GROUP BY ${groupCol}
+       ORDER BY total DESC`,
+    );
+    res.json({ Status: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ Status: false, Error: err.message });
+  }
+};

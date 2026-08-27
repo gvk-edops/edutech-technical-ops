@@ -8,6 +8,8 @@ import SettingsRouter from "./components/settings/SettingsRouter";
 import Clients from "./components/Clients";
 import Jobs from "./components/Jobs";
 import Inventory from "./components/Inventory";
+import Assembly from "./components/Assembly";
+import AfterService from "./components/AfterService";
 
 function App() {
   return (
@@ -23,13 +25,13 @@ function App() {
           <Route path="clients" element={<Clients />} />
           <Route path="jobs" element={<Jobs />} />
           <Route path="inventory" element={<Inventory />} />
+          <Route path="assembly" element={<Assembly />} />
+          <Route path="afterservice" element={<AfterService />} />
 
           {/* TODO: add as implemented */}
           {/* <Route path="users"          element={<Users />} /> */}
           {/* <Route path="catalogs/*"     element={<Catalogs />} /> */}
-          {/* <Route path="inventory/*"    element={<Inventory />} /> */}
           {/* <Route path="software-keys"  element={<SoftwareKeys />} /> */}
-          {/* <Route path="jobs/:id/assembly" element={<AssemblyWizard />} /> */}
           {/* <Route path="repairs"        element={<Repairs />} /> */}
           {/* <Route path="reports"        element={<Reports />} /> */}
           {/* <Route path="audit"          element={<AuditLog />} /> */}

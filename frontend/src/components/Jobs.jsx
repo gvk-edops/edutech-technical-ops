@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BriefcaseBusiness,
   Check,
@@ -16,6 +17,7 @@ import {
   Wrench,
   Lightbulb,
   CalendarDays,
+  HeartPulse,
 } from "lucide-react";
 import axios from "@/utils/axios";
 import { API_URL } from "@/lib/api";
@@ -42,6 +44,8 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 const steps = [
   { id: "client", title: "Client", icon: MapPin },
@@ -61,7 +65,128 @@ const emptyForm = {
   ram_capacity_gb: "",
 };
 
+function AfterServiceSheet({ open, onClose, job, onCreated }) {
+  const [units, setUnits] = useState([]);
+  const [technicians, setTechnicians] = useState([]);
+  const [selectedUnit, setSelectedUnit] = useState(null);
+  const [issue, setIssue] = useState("");
+  const [technicianId, setTechnicianId] = useState("");
+  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open || !job) return;
+    setLoading(true);
+    setSelectedUnit(null);
+    setIssue("");
+    setTechnicianId("");
+    setStartDate(new Date().toISOString().split("T")[0]);
+    Promise.all([
+      axios.get(`${API_URL}/afterservice/jobs/${job.id}/units`),
+      axios.get(`${API_URL}/afterservice/technicians`),
+    ])
+      .then(([unitsResponse, techniciansResponse]) => {
+        setUnits(unitsResponse.data.data || []);
+        setTechnicians(techniciansResponse.data.data || []);
+      })
+      .catch(() => toast.error("Could not load units for this job"))
+      .finally(() => setLoading(false));
+  }, [open, job]);
+
+  const submit = async () => {
+    if (!selectedUnit) return toast.error("Select a unit first");
+    if (!issue.trim()) return toast.error("Describe the reported issue");
+    setSaving(true);
+    try {
+      const response = await axios.post(`${API_URL}/afterservice`, {
+        assembled_unit_id: selectedUnit.id,
+        client_id: job.client_id,
+        reported_issue: issue.trim(),
+        technician_id: technicianId || null,
+        start_date: startDate || null,
+      });
+      toast.success(`${response.data.repair_number} created`);
+      onCreated(job.id);
+      onClose();
+    } catch (errorResponse) {
+      toast.error(errorResponse.response?.data?.Error || "Could not create repair job");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={(value) => !value && onClose()}>
+      <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 gap-0">
+        <div className="px-6 py-5 border-b">
+          <SheetTitle className="text-base">Create After-Service Job</SheetTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            {job?.job_number} · {job?.client_name}
+          </p>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Select Unit</p>
+            {loading ? (
+              <div className="flex justify-center py-8"><span className="text-sm text-muted-foreground">Loading units...</span></div>
+            ) : units.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">No assembled units found.</div>
+            ) : (
+              <div className="space-y-2">
+                {units.map((unit) => (
+                  <button
+                    key={unit.id}
+                    type="button"
+                    disabled={Boolean(unit.active_repair_id)}
+                    onClick={() => setSelectedUnit(unit)}
+                    className={`w-full rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                      unit.active_repair_id ? "cursor-not-allowed opacity-60" : "hover:bg-muted/50"
+                    } ${selectedUnit?.id === unit.id ? "border-primary bg-primary/5" : ""}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-sm font-semibold">{unit.ops_serial}</span>
+                      <span className="text-xs capitalize text-muted-foreground">
+                        {unit.active_repair_id ? `Repair ${unit.repair_number} active` : unit.status?.replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{unit.ops_model}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Reported Issue <span className="text-destructive">*</span></Label>
+            <Textarea value={issue} onChange={(event) => setIssue(event.target.value)} placeholder="Describe the problem reported by the client..." rows={4} />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Assign Technician</Label>
+              <Select value={technicianId} onValueChange={setTechnicianId}>
+                <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                <SelectContent>{technicians.map((technician) => <SelectItem key={technician.id} value={String(technician.id)}>{technician.full_name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Start Date</Label>
+              <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+            </div>
+          </div>
+        </div>
+        <div className="border-t px-6 py-4 flex justify-end gap-2 bg-background">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={saving || loading || !selectedUnit}>{saving ? "Creating..." : "Create Repair"}</Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export default function Jobs() {
+  const navigate = useNavigate();
   const [data, setData] = useState({
     clients: [],
     smartboards: [],
@@ -81,6 +206,7 @@ export default function Jobs() {
   const [workspaceTab, setWorkspaceTab] = useState("create");
   const [jobs, setJobs] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(false);
+  const [afterServiceJob, setAfterServiceJob] = useState(null);
   const activeSteps =
     jobType === "smartboard" ? [steps[0], steps[1], steps[5]] : steps;
   const currentStep = activeSteps[step];
@@ -311,6 +437,12 @@ export default function Jobs() {
     return (
       <main className="overflow-y-auto p-5">
         <div className="mx-auto max-w-6xl py-4 md:py-8">
+          <AfterServiceSheet
+            open={Boolean(afterServiceJob)}
+            job={afterServiceJob}
+            onClose={() => setAfterServiceJob(null)}
+            onCreated={(jobId) => navigate(`/app/afterservice?job=${jobId}`)}
+          />
           {workspaceTabs}
           <div className="mb-6 flex items-end justify-between gap-3">
             <div>
@@ -457,8 +589,22 @@ export default function Jobs() {
                     )}
 
                     {/* Footer */}
-                    <div className="mt-auto border-t pt-3 text-[11px] text-muted-foreground">
-                      Created by {job.created_by_name || "—"} · {new Date(job.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                    <div className="mt-auto border-t pt-3 flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-muted-foreground">
+                        Created by {job.created_by_name || "—"} · {new Date(job.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                      </span>
+                      {job.job_type !== "smartboard" && ["ready_for_delivery", "completed"].includes(job.status) && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground"
+                            onClick={(e) => { e.stopPropagation(); navigate(`/app/afterservice?job=${job.id}`); }}>
+                            View
+                          </Button>
+                          <Button size="sm" variant="outline" className="gap-1.5 text-rose-600 border-rose-200 hover:bg-rose-50"
+                            onClick={(e) => { e.stopPropagation(); setAfterServiceJob(job); }}>
+                            <HeartPulse className="h-3.5 w-3.5" /> Create
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
