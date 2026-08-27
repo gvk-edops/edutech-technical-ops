@@ -17,8 +17,8 @@ export const getAfterServiceJobs = async (req, res) => {
       SELECT j.id, j.job_number, j.job_type, j.status, j.required_date, j.client_id,
              c.name AS client_name, d.name AS district_name,
              om.model_name AS ops_model, sb.model_name AS smartboard_model,
-             COUNT(au.id) AS units_assembled,
-             SUM(CASE WHEN au.status = 'assembled' THEN 1 ELSE 0 END) AS units_ready,
+              COUNT(au.id) AS units_assembled,
+              SUM(CASE WHEN au.status = 'delivered' THEN 1 ELSE 0 END) AS units_ready,
              SUM(CASE WHEN rj.id IS NOT NULL THEN 1 ELSE 0 END) AS units_in_repair
       FROM jobs j
       JOIN clients c ON c.id = j.client_id
@@ -27,9 +27,9 @@ export const getAfterServiceJobs = async (req, res) => {
       LEFT JOIN smartboard_models sb ON sb.id = j.smartboard_model_id
       LEFT JOIN assembled_units au ON au.job_id = j.id
       LEFT JOIN repair_jobs rj ON rj.assembled_unit_id = au.id AND rj.status NOT IN ('completed','closed')
-      WHERE j.status IN ('ready_for_delivery','completed') AND j.job_type != 'smartboard'
+      WHERE j.status = 'completed' AND j.job_type != 'smartboard'
       GROUP BY j.id
-      HAVING units_assembled > 0
+      HAVING units_ready > 0 OR units_in_repair > 0
       ORDER BY j.id DESC
     `);
     res.json({ Status: true, data: rows });
@@ -50,7 +50,7 @@ export const getJobUnits = async (req, res) => {
       JOIN inventory_ops io ON io.id = au.ops_inventory_id
       JOIN ops_models om ON om.id = io.ops_model_id
       LEFT JOIN repair_jobs rj ON rj.assembled_unit_id = au.id AND rj.status NOT IN ('completed','closed')
-      WHERE au.job_id = ?
+      WHERE au.job_id = ? AND au.status IN ('delivered', 'in_repair')
       ORDER BY au.id ASC`, [req.params.jobId]);
     res.json({ Status: true, data: rows });
   } catch (err) {
@@ -207,13 +207,13 @@ export const createRepair = async (req, res) => {
     // Keep the client and unit relationship authoritative on the server and
     // prevent two open repairs being created for the same unit.
     const [[unit]] = await conn.query(`
-      SELECT au.id, j.client_id, j.status, j.job_type
+      SELECT au.id, au.status AS unit_status, j.client_id, j.status, j.job_type
       FROM assembled_units au
       JOIN jobs j ON j.id = au.job_id
       WHERE au.id = ?`, [assembled_unit_id]);
     if (!unit) throw new Error("Assembled unit not found");
     if (Number(unit.client_id) !== Number(client_id)) throw new Error("Unit does not belong to this client");
-    if (unit.job_type === "smartboard" || !["ready_for_delivery", "completed"].includes(unit.status))
+    if (unit.job_type === "smartboard" || unit.status !== "completed" || unit.unit_status !== "delivered")
       throw new Error("Unit is not available for after-service");
     const [[activeRepair]] = await conn.query(
       "SELECT id FROM repair_jobs WHERE assembled_unit_id=? AND status NOT IN ('completed','closed') LIMIT 1",
@@ -258,7 +258,7 @@ export const updateStatus = async (req, res) => {
     await conn.query(`UPDATE repair_jobs SET ${setCols} WHERE id=?`, [...Object.values(updates), req.params.id]);
 
     if (status === "completed" || status === "closed")
-      await conn.query("UPDATE assembled_units SET status='assembled' WHERE id=?", [rj.assembled_unit_id]);
+      await conn.query("UPDATE assembled_units SET status='delivered' WHERE id=?", [rj.assembled_unit_id]);
 
     await conn.commit();
     res.json({ Status: true });

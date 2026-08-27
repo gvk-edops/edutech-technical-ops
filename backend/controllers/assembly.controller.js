@@ -354,9 +354,9 @@ export const setWifi = async (req, res) => {
 // ── POST /assembly/:unitId/software ───────────────────────────────────────────
 // Creates the key in main_software_keys then assigns it to the unit
 export const addSoftware = async (req, res) => {
-  const { software_catalog_id, license_key, license_type, subscription_start_date, subscription_end_date } = req.body;
-  if (!software_catalog_id || !license_key?.trim())
-    return res.status(400).json({ Status: false, Error: "software_catalog_id and license_key required" });
+  const { software_catalog_id, software_key_id, license_key, license_type, subscription_start_date, subscription_end_date } = req.body;
+  if (!software_catalog_id || (!software_key_id && !license_key?.trim()))
+    return res.status(400).json({ Status: false, Error: "software_catalog_id and a software key are required" });
 
   const conn = await pool.getConnection();
   try {
@@ -367,19 +367,29 @@ export const addSoftware = async (req, res) => {
       "UPDATE assembly_main_software SET is_active=0, unassigned_at=NOW() WHERE assembled_unit_id=? AND software_catalog_id=? AND is_active=1",
       [req.params.unitId, software_catalog_id]);
 
-    const [keyResult] = await conn.query(
-      `INSERT INTO main_software_keys (software_catalog_id, license_key, license_type, subscription_start_date, subscription_end_date, status)
-       VALUES (?,?,?,?,?,'assigned')`,
-      [software_catalog_id, license_key.trim(), license_type || "lifetime",
-       subscription_start_date || null, subscription_end_date || null]);
+    let keyId = software_key_id || null;
+    if (keyId) {
+      const [[key]] = await conn.query(
+        "SELECT id FROM main_software_keys WHERE id=? AND software_catalog_id=? AND status='purchased' FOR UPDATE",
+        [keyId, software_catalog_id],
+      );
+      if (!key) throw new Error("Selected software key is no longer available");
+    } else {
+      const [keyResult] = await conn.query(
+        `INSERT INTO main_software_keys (software_catalog_id, license_key, license_type, subscription_start_date, subscription_end_date, status)
+         VALUES (?,?,?,?,?,'assigned')`,
+        [software_catalog_id, license_key.trim(), license_type || "lifetime",
+         subscription_start_date || null, subscription_end_date || null]);
+      keyId = keyResult.insertId;
+    }
 
     await conn.query(
       `INSERT INTO assembly_main_software (assembled_unit_id, software_catalog_id, software_key_id, is_active)
        VALUES (?,?,?,1)`,
-      [req.params.unitId, software_catalog_id, keyResult.insertId]);
+       [req.params.unitId, software_catalog_id, keyId]);
 
     await conn.commit();
-    res.json({ Status: true, key_id: keyResult.insertId });
+    res.json({ Status: true, key_id: keyId });
   } catch (err) {
     await conn.rollback();
     if (err.code === "ER_DUP_ENTRY") return res.status(400).json({ Status: false, Error: "License key already exists" });

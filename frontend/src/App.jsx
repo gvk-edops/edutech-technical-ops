@@ -10,6 +10,8 @@ import Jobs from "./components/Jobs";
 import Inventory from "./components/Inventory";
 import Assembly from "./components/Assembly";
 import AfterService from "./components/AfterService";
+import Delivery from "./components/Delivery";
+import SoftwareKeys from "./components/SoftwareKeys";
 
 function App() {
   return (
@@ -26,12 +28,13 @@ function App() {
           <Route path="jobs" element={<Jobs />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="assembly" element={<Assembly />} />
+          <Route path="delivery" element={<Delivery />} />
+          <Route path="software-keys" element={<SoftwareKeys />} />
           <Route path="afterservice" element={<AfterService />} />
 
           {/* TODO: add as implemented */}
           {/* <Route path="users"          element={<Users />} /> */}
           {/* <Route path="catalogs/*"     element={<Catalogs />} /> */}
-          {/* <Route path="software-keys"  element={<SoftwareKeys />} /> */}
           {/* <Route path="repairs"        element={<Repairs />} /> */}
           {/* <Route path="reports"        element={<Reports />} /> */}
           {/* <Route path="audit"          element={<AuditLog />} /> */}

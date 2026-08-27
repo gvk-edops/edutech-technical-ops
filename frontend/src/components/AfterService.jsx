@@ -846,7 +846,7 @@ export default function AfterService() {
           <div className="rounded-xl border border-dashed p-16 text-center space-y-2">
             <HeartPulse className="h-10 w-10 text-muted-foreground mx-auto" />
             <p className="font-medium">No jobs available for after-service</p>
-            <p className="text-sm text-muted-foreground">Jobs appear here once they are ready for delivery or completed.</p>
+            <p className="text-sm text-muted-foreground">Delivered OPS jobs appear here for after-service support.</p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -874,7 +874,7 @@ export default function AfterService() {
 
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.district_name}</span>
-                  <span>{job.units_ready} unit{job.units_ready !== 1 ? "s" : ""} assembled</span>
+                  <span>{job.units_ready} unit{job.units_ready !== 1 ? "s" : ""} delivered</span>
                 </div>
               </button>
             ))}

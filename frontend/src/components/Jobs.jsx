@@ -593,7 +593,7 @@ export default function Jobs() {
                       <span className="text-[11px] text-muted-foreground">
                         Created by {job.created_by_name || "—"} · {new Date(job.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                       </span>
-                      {job.job_type !== "smartboard" && ["ready_for_delivery", "completed"].includes(job.status) && (
+                      {job.job_type !== "smartboard" && job.status === "completed" && (
                         <div className="flex items-center gap-1.5 shrink-0">
                           <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground"
                             onClick={(e) => { e.stopPropagation(); navigate(`/app/afterservice?job=${job.id}`); }}>

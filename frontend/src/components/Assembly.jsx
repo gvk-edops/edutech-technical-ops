@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Cpu, MemoryStick, HardDrive, Wifi, Package, CheckCircle2,
@@ -526,26 +526,37 @@ function StepWifi({ unitId, onDone }) {
 // ── Step 4: Software ───────────────────────────────────────────────────────────
 
 function StepSoftware({ job, unitId, onDone }) {
-  const reqs = job.main_software_requirements || [];
+  const reqs = useMemo(() => job.main_software_requirements || [], [job.main_software_requirements]);
   const [keys, setKeys] = useState(() =>
-    Object.fromEntries(reqs.map((r) => [r.software_catalog_id, { license_key: "", license_type: "lifetime", subscription_start_date: "", subscription_end_date: "", saved: false }]))
+    Object.fromEntries(reqs.map((r) => [r.software_catalog_id, { software_key_id: "", saved: false }]))
   );
+  const [availableKeys, setAvailableKeys] = useState({});
+  const [loadingKeys, setLoadingKeys] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all(reqs.map((req) => axios.get(`${API_URL}/software-keys?status=purchased&software_catalog_id=${req.software_catalog_id}`)))
+      .then((responses) => {
+        if (!active) return;
+        setAvailableKeys(Object.fromEntries(responses.map((response, index) => [reqs[index].software_catalog_id, response.data.data || []])));
+      })
+      .catch(() => active && toast.error("Failed to load available software keys"))
+      .finally(() => active && setLoadingKeys(false));
+    return () => { active = false; };
+  }, [reqs]);
 
   const update = (id, field, val) =>
     setKeys((prev) => ({ ...prev, [id]: { ...prev[id], [field]: val, saved: false } }));
 
   const saveKey = async (req) => {
     const k = keys[req.software_catalog_id];
-    if (!k.license_key.trim()) return toast.error("Enter the license key");
+    if (!k.software_key_id) return toast.error("Select an available software key");
     setSaving(true);
     try {
       await axios.post(`${API_URL}/assembly/${unitId}/software`, {
         software_catalog_id: req.software_catalog_id,
-        license_key: k.license_key,
-        license_type: k.license_type,
-        subscription_start_date: k.subscription_start_date || null,
-        subscription_end_date: k.subscription_end_date || null,
+        software_key_id: Number(k.software_key_id),
       });
       setKeys((prev) => ({ ...prev, [req.software_catalog_id]: { ...prev[req.software_catalog_id], saved: true } }));
       toast.success(`${req.name} key saved`);
@@ -580,41 +591,17 @@ function StepSoftware({ job, unitId, onDone }) {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs">License Key *</Label>
-                <Input
-                  value={k.license_key}
-                  onChange={(e) => update(req.software_catalog_id, "license_key", e.target.value)}
-                  placeholder="XXXXX-XXXXX-XXXXX-XXXXX"
-                  className="font-mono text-sm"
-                  disabled={k.saved}
-                />
+                <Label className="text-xs">Available License Key *</Label>
+                <Select value={k.software_key_id} onValueChange={(value) => update(req.software_catalog_id, "software_key_id", value)} disabled={k.saved || loadingKeys}>
+                  <SelectTrigger><SelectValue placeholder={loadingKeys ? "Loading keys..." : "Select a purchased key"} /></SelectTrigger>
+                  <SelectContent>
+                    {(availableKeys[req.software_catalog_id] || []).map((key) => (
+                      <SelectItem key={key.id} value={String(key.id)}>{key.license_key}{key.license_type === "subscription" && key.subscription_end_date ? ` · expires ${key.subscription_end_date}` : ""}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!loadingKeys && (availableKeys[req.software_catalog_id] || []).length === 0 && <p className="text-xs text-amber-700">No purchased keys are available for this software.</p>}
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">License Type</Label>
-                  <Select value={k.license_type} onValueChange={(v) => update(req.software_catalog_id, "license_type", v)} disabled={k.saved}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="lifetime">Lifetime</SelectItem>
-                      <SelectItem value="subscription">Subscription</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {k.license_type === "subscription" && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Start Date</Label>
-                    <Input type="date" value={k.subscription_start_date} onChange={(e) => update(req.software_catalog_id, "subscription_start_date", e.target.value)} className="h-8 text-xs" disabled={k.saved} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">End Date</Label>
-                    <Input type="date" value={k.subscription_end_date} onChange={(e) => update(req.software_catalog_id, "subscription_end_date", e.target.value)} className="h-8 text-xs" disabled={k.saved} />
-                  </div>
-                </div>
-              )}
 
               {!k.saved && (
                 <Button size="sm" onClick={() => saveKey(req)} disabled={saving} className="w-full gap-2">
@@ -622,9 +609,7 @@ function StepSoftware({ job, unitId, onDone }) {
                 </Button>
               )}
               {k.saved && (
-                <Button size="sm" variant="outline" onClick={() => setKeys((prev) => ({ ...prev, [req.software_catalog_id]: { ...prev[req.software_catalog_id], saved: false } }))} className="w-full text-xs">
-                  Edit
-                </Button>
+                <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-xs text-emerald-700">Assigned key is locked for this unit.</p>
               )}
             </div>
           );

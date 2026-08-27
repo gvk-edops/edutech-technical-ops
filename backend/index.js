@@ -42,6 +42,8 @@ autoInitialize()
     const { default: inventoryRouter } = await import("./routers/inventory.route.js");
     const { default: assemblyRouter } = await import("./routers/assembly.route.js");
     const { default: afterserviceRouter } = await import("./routers/afterservice.route.js");
+    const { default: deliveryRouter } = await import("./routers/delivery.route.js");
+    const { default: softwareKeysRouter } = await import("./routers/softwarekeys.route.js");
 
     app.use("/auth", authRouter);
     app.use("/settings", settingsRouter);
@@ -50,6 +52,8 @@ autoInitialize()
     app.use("/jobs", jobRouter);
     app.use("/inventory", inventoryRouter);
     app.use("/assembly", assemblyRouter);
+    app.use("/delivery", deliveryRouter);
+    app.use("/software-keys", softwareKeysRouter);
     app.use("/afterservice", afterserviceRouter);
 
     // TODO: mount as implemented

@@ -19,6 +19,8 @@ const sectionTitle = (path) => {
   if (path.startsWith('/app/dashboard')) return 'Dashboard';
   if (path.startsWith('/app/jobs')) return 'Jobs';
   if (path.startsWith('/app/assembly')) return 'Assembly';
+  if (path.startsWith('/app/delivery')) return 'Delivery';
+  if (path.startsWith('/app/afterservice')) return 'After Service';
   if (path.startsWith('/app/inventory')) return 'Inventory';
   if (path.startsWith('/app/software-keys')) return 'Software Keys';
   if (path.startsWith('/app/clients')) return 'Clients';
