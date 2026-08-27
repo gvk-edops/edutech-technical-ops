@@ -14,15 +14,57 @@ export const getJobs = async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT j.*, c.name AS client_name, sb.model_name AS smartboard_model,
-             om.model_name AS ops_model, d.name AS district_name
+             om.model_name AS ops_model, d.name AS district_name,
+             u.full_name AS created_by_name
       FROM jobs j
       JOIN clients c ON c.id = j.client_id
       LEFT JOIN smartboard_models sb ON sb.id = j.smartboard_model_id
-      JOIN ops_models om ON om.id = j.ops_model_id
+      LEFT JOIN ops_models om ON om.id = j.ops_model_id
       JOIN districts d ON d.id = j.district_id
+      LEFT JOIN users u ON u.id = j.created_by
       ORDER BY j.id DESC
     `);
-    res.json({ Status: true, data: rows });
+
+    const jobIds = rows.map((r) => r.id);
+    if (jobIds.length === 0) return res.json({ Status: true, data: [] });
+
+    const [storage] = await pool.query(
+      `SELECT jsr.job_id, jsr.role, ss.storage_type, ss.form_factor, ss.interface, ss.capacity_gb
+       FROM job_storage_requirements jsr
+       JOIN storage_specs ss ON ss.id = jsr.storage_spec_id
+       WHERE jsr.job_id IN (?)`,
+      [jobIds],
+    );
+    const [mainSw] = await pool.query(
+      `SELECT jms.job_id, msc.name, msc.version, msc.software_type
+       FROM job_main_software_requirements jms
+       JOIN main_software_catalog msc ON msc.id = jms.software_catalog_id
+       WHERE jms.job_id IN (?)`,
+      [jobIds],
+    );
+    const [addSw] = await pool.query(
+      `SELECT jas.job_id, asc2.name, asc2.version
+       FROM job_additional_software jas
+       JOIN additional_software_catalog asc2 ON asc2.id = jas.software_id
+       WHERE jas.job_id IN (?)`,
+      [jobIds],
+    );
+
+    const storageMap = {};
+    const mainSwMap = {};
+    const addSwMap = {};
+    for (const row of storage) (storageMap[row.job_id] ??= []).push(row);
+    for (const row of mainSw) (mainSwMap[row.job_id] ??= []).push(row);
+    for (const row of addSw) (addSwMap[row.job_id] ??= []).push(row);
+
+    const data = rows.map((job) => ({
+      ...job,
+      storage_requirements: storageMap[job.id] || [],
+      main_software: mainSwMap[job.id] || [],
+      additional_software: addSwMap[job.id] || [],
+    }));
+
+    res.json({ Status: true, data });
   } catch (err) {
     res.status(500).json({ Status: false, Error: err.message });
   }
@@ -32,6 +74,7 @@ export const createJob = async (req, res) => {
   const {
     client_id,
     job_type = "both",
+    job_date,
     smartboard_model_id,
     smartboard_count,
     ops_model_id,
@@ -46,6 +89,7 @@ export const createJob = async (req, res) => {
   const needsSmartboard = job_type === "smartboard" || job_type === "both";
   if (
     !client_id ||
+    !job_date ||
     (needsOps && (!ops_model_id || !ram_ddr_version || !ram_capacity_gb)) ||
     (needsSmartboard && !smartboard_model_id)
   )
@@ -75,8 +119,8 @@ export const createJob = async (req, res) => {
 
     const jobNumber = await nextJobNumber(connection);
     const [jobResult] = await connection.query(
-      `INSERT INTO jobs (job_number, job_type, client_id, district_id, smartboard_model_id, smartboard_count, ops_model_id, ram_ddr_version, ram_capacity_gb, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO jobs (job_number, job_type, client_id, district_id, smartboard_model_id, smartboard_count, ops_model_id, ram_ddr_version, ram_capacity_gb, required_date, created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [
         jobNumber,
         job_type,
@@ -87,6 +131,7 @@ export const createJob = async (req, res) => {
         ops_model_id || null,
         ram_ddr_version || null,
         ram_capacity_gb || null,
+        job_date,
         req.user.id,
       ],
     );

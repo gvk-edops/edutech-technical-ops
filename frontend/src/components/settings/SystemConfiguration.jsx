@@ -50,6 +50,16 @@ import {
 import axios from "@/utils/axios";
 import { API_URL } from "@/lib/api";
 import { toast } from "sonner";
+import { RamSpecCard } from "@/components/RamSpecCard";
+import { StorageSpecCard } from "@/components/StorageSpecCard";
+
+const getStorageType = (storageType, formFactor, iface) => {
+  if (storageType === "HDD") return "2.5-hdd";
+  if (formFactor === "mSATA") return "msata";
+  if (formFactor === "M.2" && iface === "NVMe") return "m2-nvme";
+  if (formFactor === "M.2" && iface === "SATA") return "m2-sata";
+  return "2.5-ssd";
+};
 
 const processorSeriesStyles = {
   i3: "border-[#8bd8f7] bg-[#e8f8ff] text-[#005b9f] dark:border-[#0071c5] dark:bg-[#003b63] dark:text-[#8bd8f7]",
@@ -87,12 +97,13 @@ const getProcessorSeriesDisplayLabel = (item) => {
 const storageOptions = {
   type: ["SSD", "HDD"],
   formFactor: {
-    SSD: ["M.2", "2.5"],
+    SSD: ["M.2", "mSATA", "2.5"],
     HDD: ["2.5", "3.5"],
   },
   interface: {
     SSD: {
       "M.2": ["NVMe", "SATA"],
+      mSATA: ["SATA"],
       2.5: ["SATA"],
     },
     HDD: ["SATA", "SAS"],
@@ -129,17 +140,6 @@ const getCatalogIcon = (columns, item = {}) => {
 
 const getCatalogCardStyle = (columns, item) => {
   const keys = columns.map((column) => column.key);
-  if (keys.includes("ddr_version")) {
-    return {
-      card: "border-violet-200 bg-gradient-to-br from-white via-violet-50 to-fuchsia-100/70 dark:border-violet-800 dark:from-slate-950 dark:via-violet-950/50 dark:to-fuchsia-950/50",
-      icon: "from-violet-500 to-fuchsia-500",
-      title: "text-violet-950 dark:text-violet-100",
-      tile: "border-violet-100 bg-gradient-to-br from-white/90 to-violet-100/60 dark:border-violet-900 dark:from-violet-950/50 dark:to-fuchsia-950/40",
-      badge: item.ddr_version,
-      badgeStyle:
-        "border-violet-300 bg-violet-100 text-violet-700 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-300",
-    };
-  }
   if (keys.includes("storage_type")) {
     const isHdd = item.storage_type === "HDD";
     return {
@@ -523,6 +523,8 @@ function ItemDialog({
   const [form, setForm] = useState(initial || {});
   const [cpuSpecs, setCpuSpecs] = useState([]);
   const isOpsForm = fields.some((field) => field.key === "processor_series");
+  const isRamForm = fields.some((field) => field.key === "ddr_version");
+  const isStorageForm = fields.some((field) => field.key === "storage_type");
 
   useEffect(() => {
     if (!isOpsForm) return;
@@ -545,7 +547,7 @@ function ItemDialog({
       setForm({ ...nextForm, form_factor: "2.5", interface: "SATA" });
     } else if (
       nextForm.storage_type === "SSD" &&
-      nextForm.form_factor === "2.5"
+      (nextForm.form_factor === "2.5" || nextForm.form_factor === "mSATA")
     ) {
       setForm({ ...nextForm, interface: "SATA" });
     } else {
@@ -576,14 +578,36 @@ function ItemDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent className={(isRamForm || isStorageForm) ? "max-w-2xl" : ""}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>
             Enter the catalog item details.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="space-y-3 py-2">
+        <div className={(isRamForm || isStorageForm) ? "flex gap-4" : ""}>
+        {isRamForm && (
+          <div className="flex-1 min-w-0">
+            <RamSpecCard
+              preview
+              ddrVersion={form.ddr_version}
+              capacity={form.capacity_gb != null && form.capacity_gb !== "" ? `${form.capacity_gb} GB` : undefined}
+              busSpeed={form.bus_speed_mhz ? `${form.bus_speed_mhz} MHz` : undefined}
+              description={form.description}
+            />
+          </div>
+        )}
+        {isStorageForm && (
+          <div className="flex-1 min-w-0">
+            <StorageSpecCard
+              preview
+              type={getStorageType(form.storage_type, form.form_factor, form.interface)}
+              capacity={form.capacity_gb != null && form.capacity_gb !== "" ? (Number(form.capacity_gb) >= 1024 ? `${Number(form.capacity_gb) / 1024} TB` : `${form.capacity_gb} GB`) : undefined}
+              description={form.description}
+            />
+          </div>
+        )}
+        <div className={`space-y-3 py-2${(isRamForm || isStorageForm) ? " flex-1" : ""}`}>
           {fields.map((f) => (
             <div key={f.key} className="space-y-1">
               <Label>
@@ -620,7 +644,7 @@ function ItemDialog({
                     } else if (
                       f.key === "form_factor" &&
                       form.storage_type === "SSD" &&
-                      v === "2.5"
+                      (v === "2.5" || v === "mSATA")
                     ) {
                       setForm((current) => ({
                         ...current,
@@ -664,6 +688,7 @@ function ItemDialog({
               )}
             </div>
           ))}
+        </div>
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -756,6 +781,185 @@ function CatalogSection({
         </AlertDialogContent>
       </AlertDialog>
     </Card>
+  );
+}
+
+// ── RAM Catalog Section ─────────────────────────────────
+const ramFields = [
+  { key: "ddr_version", label: "DDR Version (e.g. DDR4)", required: true },
+  { key: "capacity_gb", label: "Capacity (GB)", type: "number", required: true },
+  { key: "bus_speed_mhz", label: "Bus Speed (MHz, e.g. 3200)", type: "number" },
+  { key: "description", label: "Description" },
+];
+
+function RamCatalogSection() {
+  const { items, loading, save, remove } = useCatalog("/catalogs/ram-specs");
+  const [dialog, setDialog] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {items.length} item{items.length !== 1 ? "s" : ""}
+        </p>
+        <Button size="sm" onClick={() => setDialog({ item: {} })}>
+          <Plus className="h-4 w-4 mr-1" /> Add
+        </Button>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-8">No items yet</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-3">
+          {items.map((item) => (
+            <RamSpecCard
+              key={item.id}
+              ddrVersion={item.ddr_version}
+              capacity={item.capacity_gb != null ? `${item.capacity_gb} GB` : undefined}
+              busSpeed={item.bus_speed_mhz ? `${item.bus_speed_mhz} MHz` : undefined}
+              description={item.description}
+              onEdit={() => setDialog({ item })}
+              onDelete={() => setDeleteTarget(item)}
+            />
+          ))}
+        </div>
+      )}
+
+      <ItemDialog
+        open={!!dialog}
+        onOpenChange={(open) => !open && setDialog(null)}
+        title={dialog?.item?.id ? "Edit RAM Spec" : "Add RAM Spec"}
+        fields={ramFields}
+        initial={dialog?.item}
+        loading={loading}
+        onSave={save}
+      />
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete item?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => { remove(deleteTarget.id); setDeleteTarget(null); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ── Storage Catalog Section ──────────────────────────
+const storageFields = [
+  {
+    key: "storage_type",
+    label: "Type",
+    type: "select",
+    options: ["SSD", "HDD"],
+    required: true,
+  },
+  {
+    key: "form_factor",
+    label: "Form Factor",
+    type: "select",
+    options: (form) => storageOptions.formFactor[form.storage_type] || [],
+    required: true,
+  },
+  {
+    key: "interface",
+    label: "Interface",
+    type: "select",
+    options: (form) =>
+      form.storage_type === "SSD"
+        ? storageOptions.interface.SSD[form.form_factor] || []
+        : storageOptions.interface[form.storage_type] || [],
+    required: true,
+  },
+  {
+    key: "capacity_gb",
+    label: "Capacity",
+    type: "select",
+    options: (form) => storageOptions.capacity[form.storage_type] || [],
+    required: true,
+  },
+  { key: "description", label: "Description" },
+];
+
+function StorageCatalogSection() {
+  const { items, loading, save, remove } = useCatalog("/catalogs/storage-specs");
+  const [dialog, setDialog] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {items.length} item{items.length !== 1 ? "s" : ""}
+        </p>
+        <Button size="sm" onClick={() => setDialog({ item: {} })}>
+          <Plus className="h-4 w-4 mr-1" /> Add
+        </Button>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-8">No items yet</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-3">
+          {items.map((item) => (
+            <StorageSpecCard
+              key={item.id}
+              type={getStorageType(item.storage_type, item.form_factor, item.interface)}
+              capacity={item.capacity_gb != null ? (Number(item.capacity_gb) >= 1024 ? `${Number(item.capacity_gb) / 1024} TB` : `${item.capacity_gb} GB`) : undefined}
+              description={item.description}
+              onEdit={() => setDialog({ item })}
+              onDelete={() => setDeleteTarget(item)}
+            />
+          ))}
+        </div>
+      )}
+
+      <ItemDialog
+        open={!!dialog}
+        onOpenChange={(open) => !open && setDialog(null)}
+        title={dialog?.item?.id ? "Edit Storage Spec" : "Add Storage Spec"}
+        fields={storageFields}
+        initial={dialog?.item}
+        loading={loading}
+        onSave={save}
+      />
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete item?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => { remove(deleteTarget.id); setDeleteTarget(null); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
 
@@ -863,90 +1067,12 @@ export default function SystemConfiguration() {
 
         {/* RAM Specs */}
         <TabsContent value="ram">
-          <CatalogSection
-            endpoint="/catalogs/ram-specs"
-            title="RAM Specifications"
-            description="DDR version and capacity combinations"
-            columns={[
-              { key: "ddr_version", label: "DDR Version" },
-              { key: "capacity_gb", label: "Capacity (GB)" },
-              { key: "description", label: "Description" },
-            ]}
-            fields={[
-              {
-                key: "ddr_version",
-                label: "DDR Version (e.g. DDR4)",
-                required: true,
-              },
-              {
-                key: "capacity_gb",
-                label: "Capacity (GB)",
-                type: "number",
-                required: true,
-              },
-              { key: "description", label: "Description" },
-            ]}
-          />
+          <RamCatalogSection />
         </TabsContent>
 
         {/* Storage Specs */}
         <TabsContent value="storage">
-          <CatalogSection
-            endpoint="/catalogs/storage-specs"
-            title="Storage Specifications"
-            description="Form factor, interface, type, and capacity"
-            columns={[
-              { key: "storage_type", label: "Type" },
-              { key: "form_factor", label: "Form Factor" },
-              { key: "interface", label: "Interface" },
-              {
-                key: "capacity_gb",
-                label: "Capacity",
-                format: (value) =>
-                  value == null
-                    ? "—"
-                    : value >= 1024
-                      ? `${value / 1024} TB`
-                      : `${value} GB`,
-              },
-            ]}
-            fields={[
-              {
-                key: "storage_type",
-                label: "Type",
-                type: "select",
-                options: ["SSD", "HDD"],
-                required: true,
-              },
-              {
-                key: "form_factor",
-                label: 'Form Factor (e.g. M.2, 2.5")',
-                type: "select",
-                options: (form) =>
-                  storageOptions.formFactor[form.storage_type] || [],
-                required: true,
-              },
-              {
-                key: "interface",
-                label: "Interface (e.g. NVMe, SATA)",
-                type: "select",
-                options: (form) =>
-                  form.storage_type === "SSD"
-                    ? storageOptions.interface.SSD[form.form_factor] || []
-                    : storageOptions.interface[form.storage_type] || [],
-                required: true,
-              },
-              {
-                key: "capacity_gb",
-                label: "Capacity (GB)",
-                type: "select",
-                options: (form) =>
-                  storageOptions.capacity[form.storage_type] || [],
-                required: true,
-              },
-              { key: "description", label: "Description" },
-            ]}
-          />
+          <StorageCatalogSection />
         </TabsContent>
 
         {/* Network Card Models */}

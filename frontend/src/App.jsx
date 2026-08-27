@@ -7,6 +7,7 @@ import SettingsHub from "./components/settings/SettingsHub";
 import SettingsRouter from "./components/settings/SettingsRouter";
 import Clients from "./components/Clients";
 import Jobs from "./components/Jobs";
+import Inventory from "./components/Inventory";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Route path="settings/*" element={<SettingsRouter />} />
           <Route path="clients" element={<Clients />} />
           <Route path="jobs" element={<Jobs />} />
+          <Route path="inventory" element={<Inventory />} />
 
           {/* TODO: add as implemented */}
           {/* <Route path="users"          element={<Users />} /> */}

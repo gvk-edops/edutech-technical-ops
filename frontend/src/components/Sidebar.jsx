@@ -5,6 +5,7 @@ import {
   Settings,
   Zap,
   Users,
+  Package,
 } from "lucide-react";
 import {
   Sidebar as ShadcnSidebar,
@@ -26,6 +27,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/app/dashboard" },
   { icon: Users, label: "Clients", href: "/app/clients" },
   { icon: BriefcaseBusiness, label: "Jobs", href: "/app/jobs" },
+  { icon: Package, label: "Inventory", href: "/app/inventory" },
   // TODO: add as sections are implemented
   // { icon: Briefcase,       label: 'Jobs',       href: '/app/jobs' },
   // { icon: Wrench,          label: 'Assembly',   href: '/app/assembly' },

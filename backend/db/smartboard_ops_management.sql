@@ -253,6 +253,7 @@ CREATE TABLE jobs (
     ops_model_id            INT UNSIGNED NULL,
     ram_ddr_version         VARCHAR(10) NULL,
     ram_capacity_gb         SMALLINT UNSIGNED NULL,   -- total required RAM, e.g., 16
+    required_date           DATE NULL,
     status                  ENUM('created','assembly_in_progress','ready_for_delivery','completed','cancelled') NOT NULL DEFAULT 'created',
     created_by              INT UNSIGNED NOT NULL,
     created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

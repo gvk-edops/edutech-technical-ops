@@ -65,11 +65,18 @@ async function autoInitialize() {
   );
   if (cnt > 0) {
     console.log("✅ Database already initialised, skipping schema import");
-    try {
-      await conn.query("ALTER TABLE ram_specs DROP COLUMN brand");
-      console.log("✅ Removed RAM brand column");
-    } catch (err) {
-      if (!err.message.includes("Can't DROP")) throw err;
+    const alterations = [
+      { sql: "ALTER TABLE ram_specs DROP COLUMN brand", msg: "Removed RAM brand column" },
+      { sql: "ALTER TABLE ram_specs ADD COLUMN bus_speed_mhz INT NULL AFTER capacity_gb", msg: "Added RAM bus_speed_mhz column" },
+      { sql: "ALTER TABLE jobs ADD COLUMN required_date DATE NULL AFTER ram_capacity_gb", msg: "Added jobs required_date column" },
+    ];
+    for (const { sql, msg } of alterations) {
+      try {
+        await conn.query(sql);
+        console.log(`✅ ${msg}`);
+      } catch (err) {
+        if (!err.message.includes("Can't DROP") && !err.message.includes("Duplicate column name")) throw err;
+      }
     }
     await seedLocations(conn);
     await conn.query(

@@ -15,6 +15,7 @@ import {
   ClipboardCheck,
   Wrench,
   Lightbulb,
+  CalendarDays,
 } from "lucide-react";
 import axios from "@/utils/axios";
 import { API_URL } from "@/lib/api";
@@ -31,6 +32,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -38,7 +40,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const steps = [
   { id: "client", title: "Client", icon: MapPin },
@@ -49,6 +52,7 @@ const steps = [
   { id: "review", title: "Review", icon: Check },
 ];
 const emptyForm = {
+  job_date: "",
   client_id: "",
   smartboard_model_id: "",
   smartboard_count: "1",
@@ -74,6 +78,9 @@ export default function Jobs() {
   const [step, setStep] = useState(0);
   const [screen, setScreen] = useState("overview");
   const [jobType, setJobType] = useState("");
+  const [workspaceTab, setWorkspaceTab] = useState("create");
+  const [jobs, setJobs] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
   const activeSteps =
     jobType === "smartboard" ? [steps[0], steps[1], steps[5]] : steps;
   const currentStep = activeSteps[step];
@@ -82,15 +89,7 @@ export default function Jobs() {
 
   const loadData = useCallback(async () => {
     try {
-      const [
-        clients,
-        smartboards,
-        ops,
-        rams,
-        storage,
-        mainSoftware,
-        additionalSoftware,
-      ] = await Promise.all([
+      const requests = await Promise.allSettled([
         axios.get(`${API_URL}/clients`),
         axios.get(`${API_URL}/catalogs/smartboard-models`),
         axios.get(`${API_URL}/catalogs/ops-models`),
@@ -99,14 +98,16 @@ export default function Jobs() {
         axios.get(`${API_URL}/catalogs/main-software`),
         axios.get(`${API_URL}/catalogs/additional-software`),
       ]);
+      const getData = (result) =>
+        result.status === "fulfilled" ? result.value.data.data || [] : [];
       setData({
-        clients: clients.data.data || [],
-        smartboards: smartboards.data.data || [],
-        ops: ops.data.data || [],
-        rams: rams.data.data || [],
-        storage: storage.data.data || [],
-        mainSoftware: mainSoftware.data.data || [],
-        additionalSoftware: additionalSoftware.data.data || [],
+        clients: getData(requests[0]),
+        smartboards: getData(requests[1]),
+        ops: getData(requests[2]),
+        rams: getData(requests[3]),
+        storage: getData(requests[4]),
+        mainSoftware: getData(requests[5]),
+        additionalSoftware: getData(requests[6]),
       });
     } catch {
       toast.error("Could not load job options");
@@ -117,6 +118,22 @@ export default function Jobs() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const loadJobs = useCallback(async () => {
+    setJobsLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/jobs`);
+      setJobs(response.data.data || []);
+    } catch {
+      toast.error("Could not load jobs");
+    } finally {
+      setJobsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (workspaceTab === "view") loadJobs();
+  }, [workspaceTab, loadJobs]);
 
   const selectedClient = data.clients.find(
     (client) => String(client.id) === form.client_id,
@@ -141,8 +158,8 @@ export default function Jobs() {
     setForm((current) => ({ ...current, [key]: value }));
 
   const validateStep = () => {
-    if (currentStep.id === "client" && !form.client_id)
-      return "Choose a client first";
+    if (currentStep.id === "client" && (!form.client_id || !form.job_date))
+      return !form.client_id ? "Choose a client first" : "Choose a job date";
     if (
       currentStep.id === "hardware" &&
       ((jobType !== "smartboard" && !form.ops_model_id) ||
@@ -186,8 +203,12 @@ export default function Jobs() {
         itemIndex === index ? { ...item, [key]: value } : item,
       ),
     );
-  const toggleSoftware = (key, id, checked) =>
-    key(checked ? [...key, id] : key.filter((value) => value !== id));
+  const toggleSoftware = (setIds, id, checked) =>
+    setIds((currentIds) =>
+      checked
+        ? [...new Set([...currentIds, id])]
+        : currentIds.filter((value) => value !== id),
+    );
 
   const submit = async () => {
     const error = validateStep();
@@ -197,6 +218,7 @@ export default function Jobs() {
       const response = await axios.post(`${API_URL}/jobs`, {
         ...form,
         job_type: jobType,
+        job_date: form.job_date,
         client_id: Number(form.client_id),
         smartboard_model_id: form.smartboard_model_id
           ? Number(form.smartboard_model_id)
@@ -223,6 +245,7 @@ export default function Jobs() {
       setStep(0);
       setJobType("");
       setScreen("overview");
+      loadJobs();
     } catch (errorResponse) {
       toast.error(
         errorResponse.response?.data?.Error || "Could not create job",
@@ -251,57 +274,246 @@ export default function Jobs() {
     return "Check every requirement before creating the job.";
   };
 
+  const workspaceTabs = (
+    <Tabs value={workspaceTab} onValueChange={setWorkspaceTab} className="mb-6">
+      <TabsList className="grid h-11 w-full max-w-md grid-cols-2">
+        <TabsTrigger value="create" className="gap-2">
+          <Plus className="h-4 w-4" /> Create Job
+        </TabsTrigger>
+        <TabsTrigger value="view" className="gap-2">
+          <ClipboardCheck className="h-4 w-4" /> View Jobs
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
+
   if (loading)
     return (
-      <main className="p-5">
-        <p className="py-16 text-center text-muted-foreground">
-          Loading job options...
-        </p>
+      <main className="flex min-h-[60vh] items-center justify-center p-5">
+        <div className="text-center space-y-3">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">
+            Loading job options...
+          </p>
+        </div>
+      </main>
+    );
+
+  const statusColor = (status) => {
+    if (status === "completed") return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    if (status === "ready_for_delivery") return "bg-sky-100 text-sky-700 border-sky-200";
+    if (status === "assembly_in_progress") return "bg-amber-100 text-amber-700 border-amber-200";
+    if (status === "cancelled") return "bg-rose-100 text-rose-700 border-rose-200";
+    return "bg-slate-100 text-slate-600 border-slate-200";
+  };
+
+  if (workspaceTab === "view")
+    return (
+      <main className="overflow-y-auto p-5">
+        <div className="mx-auto max-w-6xl py-4 md:py-8">
+          {workspaceTabs}
+          <div className="mb-6 flex items-end justify-between gap-3">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Jobs</h1>
+              <p className="mt-1 text-muted-foreground">
+                Review job scopes, requirements, and current status.
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                setWorkspaceTab("create");
+                setScreen("type");
+              }}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" /> New Job
+            </Button>
+          </div>
+          {jobsLoading ? (
+            <p className="py-16 text-center text-muted-foreground">Loading jobs...</p>
+          ) : jobs.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center text-muted-foreground">
+                No jobs created yet.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {jobs.map((job) => (
+                <Card key={job.id} className="flex flex-col overflow-hidden shadow-sm">
+                  {/* Header */}
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <CardTitle className="text-base font-bold tracking-tight">
+                          {job.job_number}
+                        </CardTitle>
+                        <CardDescription className="mt-0.5 truncate">
+                          {job.client_name}
+                        </CardDescription>
+                      </div>
+                      <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${statusColor(job.status)}`}>
+                        {job.status.replaceAll("_", " ")}
+                      </span>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="flex flex-1 flex-col gap-4 pt-0">
+                    {/* Location + scope row */}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {job.district_name}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <CalendarDays className="h-3 w-3" />
+                        {job.required_date
+                          ? new Date(job.required_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                          : "No date set"}
+                      </span>
+                    </div>
+
+                    <Separator />
+
+                    {/* Scope badge */}
+                    <div className="flex items-center gap-2">
+                      {job.job_type === "smartboard" && <Monitor className="h-3.5 w-3.5 text-sky-500" />}
+                      {job.job_type === "ops" && <Wrench className="h-3.5 w-3.5 text-amber-500" />}
+                      {job.job_type === "both" && <BriefcaseBusiness className="h-3.5 w-3.5 text-emerald-500" />}
+                      <span className="text-xs font-medium capitalize">
+                        {job.job_type === "both" ? "Smartboard + OPS" : job.job_type === "smartboard" ? "Smartboard only" : "OPS only"}
+                      </span>
+                    </div>
+
+                    {/* Hardware */}
+                    <div className="space-y-2 text-sm">
+                      {job.smartboard_model && (
+                        <div className="flex items-start gap-2">
+                          <Monitor className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0">
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Smartboard</p>
+                            <p className="font-medium truncate">{job.smartboard_model}</p>
+                            {job.smartboard_count > 0 && (
+                              <p className="text-xs text-muted-foreground">Qty: {job.smartboard_count}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {job.ops_model && (
+                        <div className="flex items-start gap-2">
+                          <Cpu className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0">
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">OPS Model</p>
+                            <p className="font-medium truncate">{job.ops_model}</p>
+                          </div>
+                        </div>
+                      )}
+                      {job.ram_ddr_version && (
+                        <div className="flex items-start gap-2">
+                          <MemoryStick className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">RAM</p>
+                            <p className="font-medium">{job.ram_ddr_version} — {job.ram_capacity_gb} GB</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Storage */}
+                    {job.storage_requirements?.length > 0 && (
+                      <div>
+                        <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                          <HardDrive className="h-3 w-3" /> Storage
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {job.storage_requirements.map((s, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs capitalize">
+                              {s.role}: {s.storage_type} {s.capacity_gb >= 1024 ? `${s.capacity_gb / 1024} TB` : `${s.capacity_gb} GB`} {s.interface}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Software */}
+                    {(job.main_software?.length > 0 || job.additional_software?.length > 0) && (
+                      <div>
+                        <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                          <Package className="h-3 w-3" /> Software
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {job.main_software.map((s, i) => (
+                            <Badge key={`m-${i}`} variant="outline" className="text-xs">
+                              {s.name}{s.version ? ` ${s.version}` : ""}
+                            </Badge>
+                          ))}
+                          {job.additional_software.map((s, i) => (
+                            <Badge key={`a-${i}`} variant="outline" className="text-xs text-muted-foreground">
+                              {s.name}{s.version ? ` ${s.version}` : ""}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer */}
+                    <div className="mt-auto border-t pt-3 text-[11px] text-muted-foreground">
+                      Created by {job.created_by_name || "—"} · {new Date(job.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
     );
 
   if (screen === "overview")
     return (
       <main className="overflow-y-auto p-5">
-        <div className="mx-auto max-w-5xl py-4 md:py-10">
-          <div className="max-w-2xl">
-            <Badge className="mb-4 gap-2">
-              <ClipboardCheck className="h-3.5 w-3.5" /> Job workspace
-            </Badge>
-            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
-              Build a job with confidence.
-            </h1>
-            <p className="mt-3 text-base leading-7 text-muted-foreground">
-              Create a clear requirement record for a new smartboard
-              installation or an OPS service request. The guided workflow keeps
-              every choice organised before anything is saved.
-            </p>
-          </div>
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
+        <div className="mx-auto max-w-6xl py-6 md:py-8">
+          {workspaceTabs}
+          <Badge variant="secondary" className="mb-5 gap-1.5">
+            <ClipboardCheck className="h-3.5 w-3.5" /> Job workspace
+          </Badge>
+          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+            Build a job with confidence.
+          </h1>
+          <p className="mt-3 max-w-xl text-base leading-7 text-muted-foreground">
+            Create a clear requirement record for a new smartboard installation
+            or an OPS service request.
+          </p>
+          <Separator className="my-8" />
+          <div className="grid gap-4 sm:grid-cols-3">
             {[
               [
                 "Before you start",
                 "Have the client and component requirements ready.",
                 MapPin,
+                "text-sky-600",
               ],
               [
                 "What you will define",
                 "Hardware, memory, storage, and software needs.",
                 Cpu,
+                "text-violet-600",
               ],
               [
                 "How it works",
                 "Complete each step, review the summary, then create.",
                 Check,
+                "text-emerald-600",
               ],
-            ].map(([title, description, Icon]) => (
-              <Card
-                key={title}
-                className="border-sky-100 bg-gradient-to-br from-white to-sky-50/70 dark:border-sky-900 dark:from-slate-950 dark:to-sky-950/30"
-              >
+            ].map(([title, description, Icon, color]) => (
+              <Card key={title}>
                 <CardContent className="p-5">
-                  <Icon className="h-5 w-5 text-sky-600" />
-                  <p className="mt-4 font-semibold">{title}</p>
+                  <div
+                    className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-muted ${color}`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <p className="font-semibold">{title}</p>
                   <p className="mt-1 text-sm leading-5 text-muted-foreground">
                     {description}
                   </p>
@@ -309,14 +521,14 @@ export default function Jobs() {
               </Card>
             ))}
           </div>
-          <Card className="mt-6 max-w-2xl">
-            <CardHeader>
-              <CardTitle>Ready to begin?</CardTitle>
-              <CardDescription>
-                Choose the workflow that matches the request.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Card className="mt-6">
+            <CardContent className="flex items-center justify-between p-5">
+              <div>
+                <p className="font-semibold">Ready to begin?</p>
+                <p className="text-sm text-muted-foreground">
+                  Choose the workflow that matches the request.
+                </p>
+              </div>
               <Button onClick={() => setScreen("type")} className="gap-2">
                 Create Job <ChevronRight className="h-4 w-4" />
               </Button>
@@ -329,11 +541,12 @@ export default function Jobs() {
   if (screen === "type")
     return (
       <main className="overflow-y-auto p-5">
-        <div className="mx-auto max-w-3xl py-4 md:py-10">
+        <div className="mx-auto max-w-6xl py-6 md:py-8">
+          {workspaceTabs}
           <Button
             variant="ghost"
             onClick={() => setScreen("overview")}
-            className="mb-6 gap-2"
+            className="mb-6 gap-2 -ml-2"
           >
             <ChevronLeft className="h-4 w-4" /> Back
           </Button>
@@ -341,70 +554,63 @@ export default function Jobs() {
             What kind of job is this?
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Tell us what this request needs, and we will show only the relevant
-            steps.
+            Select a workflow — only the relevant steps will be shown.
           </p>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <Card
-              className="cursor-pointer border-2 transition-colors hover:border-primary"
-              onClick={() => {
-                setJobType("smartboard");
-                setScreen("wizard");
-              }}
-            >
-              <CardHeader>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
-                  <Monitor className="h-5 w-5" />
-                </div>
-                <CardTitle className="mt-3">Smartboard only</CardTitle>
-                <CardDescription>
-                  Add a smartboard model and use its catalog description.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Badge variant="secondary">Simple 3-step flow</Badge>
-              </CardContent>
-            </Card>
-            <Card
-              className="cursor-pointer border-2 transition-colors hover:border-primary"
-              onClick={() => {
-                setJobType("ops");
-                setScreen("wizard");
-              }}
-            >
-              <CardHeader>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                  <Wrench className="h-5 w-5" />
-                </div>
-                <CardTitle className="mt-3">OPS only</CardTitle>
-                <CardDescription>
-                  Configure an OPS unit without selecting a smartboard.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Badge variant="secondary">OPS requirements</Badge>
-              </CardContent>
-            </Card>
-            <Card
-              className="cursor-pointer border-2 transition-colors hover:border-primary"
-              onClick={() => {
-                setJobType("both");
-                setScreen("wizard");
-              }}
-            >
-              <CardHeader>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                  <BriefcaseBusiness className="h-5 w-5" />
-                </div>
-                <CardTitle className="mt-3">Smartboard + OPS</CardTitle>
-                <CardDescription>
-                  Define the complete combined requirement.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Badge variant="secondary">Full workflow</Badge>
-              </CardContent>
-            </Card>
+          <Separator className="my-6" />
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                type: "smartboard",
+                label: "Smartboard only",
+                desc: "Add a smartboard model and use its catalog description.",
+                icon: Monitor,
+                badge: "3-step flow",
+                color:
+                  "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
+              },
+              {
+                type: "ops",
+                label: "OPS only",
+                desc: "Configure an OPS unit without selecting a smartboard.",
+                icon: Wrench,
+                badge: "OPS requirements",
+                color:
+                  "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+              },
+              {
+                type: "both",
+                label: "Smartboard + OPS",
+                desc: "Define the complete combined requirement.",
+                icon: BriefcaseBusiness,
+                badge: "Full workflow",
+                color:
+                  "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+              },
+            ].map(({ type, label, desc, icon: Icon, badge, color }) => (
+              <Card
+                key={type}
+                className="cursor-pointer border-2 transition-all hover:border-primary hover:shadow-md"
+                onClick={() => {
+                  setJobType(type);
+                  setScreen("wizard");
+                }}
+              >
+                <CardHeader className="pb-3">
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-lg ${color}`}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <CardTitle className="mt-3 text-base">{label}</CardTitle>
+                  <CardDescription className="text-sm">{desc}</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <Badge variant="secondary" className="text-xs">
+                    {badge}
+                  </Badge>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </main>
@@ -412,74 +618,134 @@ export default function Jobs() {
 
   return (
     <main className="overflow-y-auto p-5">
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-cyan-500 text-white">
-            <BriefcaseBusiness className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Create Job
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Define the build requirements step by step.
-            </p>
+      <div className="mx-auto mb-5 max-w-6xl">
+        {workspaceTabs}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setScreen("type")}
+              className="h-8 w-8"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight">
+                Create Job
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Define the build requirements step by step.
+              </p>
+            </div>
           </div>
+          <Badge variant="outline" className="capitalize hidden sm:flex">
+            {jobType === "smartboard"
+              ? "Smartboard only"
+              : jobType === "ops"
+                ? "OPS only"
+                : "Smartboard + OPS"}
+          </Badge>
         </div>
       </div>
-      <div className="mx-auto grid max-w-6xl items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <Card className="border-sky-100 bg-gradient-to-b from-white to-sky-50/70 dark:border-sky-900 dark:from-slate-950 dark:to-sky-950/30 lg:sticky lg:top-5">
-          <CardHeader className="border-b pb-4">
-            <CardTitle className="text-base">Build progress</CardTitle>
-            <CardDescription>
-              {jobType === "smartboard"
-                ? "Smartboard only"
-                : jobType === "ops"
-                  ? "OPS only"
-                  : "Smartboard + OPS"}
-            </CardDescription>
+      <div className="mx-auto flex max-w-5xl items-start gap-5">
+        <Card className="sticky top-5 w-[200px] shrink-0">
+          <CardHeader className="p-4 pb-3">
+            <CardTitle className="text-sm">Progress</CardTitle>
+            <Progress
+              value={((step + 1) / activeSteps.length) * 100}
+              className="h-1.5 mt-1"
+            />
+            <p className="text-xs text-muted-foreground">
+              {step + 1} of {activeSteps.length} steps
+            </p>
           </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-2 p-3 lg:grid-cols-1">
+          <Separator />
+          <CardContent className="grid grid-cols-3 gap-1.5 p-2 lg:grid-cols-1">
             {activeSteps.map(({ title, icon: Icon }, index) => (
-              <button
-                type="button"
+              <Button
                 key={title}
+                type="button"
+                variant="ghost"
                 onClick={() => index <= step && setStep(index)}
-                className={`flex items-center gap-3 rounded-lg border p-3 text-left text-xs transition-all ${index === step ? "border-primary bg-primary/10 font-semibold text-primary shadow-sm" : index < step ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-transparent text-muted-foreground hover:border-border hover:bg-muted/50"}`}
+                className={`h-auto justify-start gap-2.5 px-2 py-2 text-xs ${
+                  index === step
+                    ? "bg-primary/10 text-primary font-semibold hover:bg-primary/10"
+                    : index < step
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-muted-foreground cursor-default"
+                }`}
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background shadow-sm">
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
+                    index === step
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : index < step
+                        ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950"
+                        : "border-muted-foreground/30"
+                  }`}
+                >
                   {index < step ? (
-                    <Check className="h-4 w-4" />
+                    <Check className="h-3 w-3" />
                   ) : (
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-3 w-3" />
                   )}
                 </span>
                 <span className="hidden sm:inline lg:inline">{title}</span>
-              </button>
+              </Button>
             ))}
           </CardContent>
         </Card>
 
-        <div>
+        <div className="min-w-0 flex-1">
           <Card className="mx-auto max-w-4xl">
-            <CardHeader>
+            <CardHeader className="pb-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <CardTitle>{currentStep.title}</CardTitle>
-                <Badge variant="outline" className="capitalize">
-                  {jobType} job
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                    {(() => {
+                      const Icon = currentStep.icon;
+                      return <Icon className="h-4 w-4" />;
+                    })()}
+                  </div>
+                  <CardTitle className="text-lg">{currentStep.title}</CardTitle>
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  Step {step + 1} / {activeSteps.length}
                 </Badge>
               </div>
-              <CardDescription>
-                Step {step + 1} of {activeSteps.length}
-              </CardDescription>
+              <Progress
+                value={((step + 1) / activeSteps.length) * 100}
+                className="h-1 mt-3"
+              />
             </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
-                <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <Separator />
+            <CardContent className="space-y-5 pt-5">
+              <div className="flex items-start gap-2.5 rounded-lg border bg-muted/40 p-3 text-sm">
+                <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                 <p className="text-muted-foreground">{getStepTip()}</p>
               </div>
               {currentStep.id === "client" && (
                 <>
+                  <div className="space-y-2">
+                    <Label htmlFor="job-date">Required date *</Label>
+                    <div className="relative">
+                      <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="job-date"
+                        type="date"
+                        value={form.job_date}
+                        min={new Date().toISOString().split("T")[0]}
+                        onChange={(event) =>
+                          update("job_date", event.target.value)
+                        }
+                        className="pl-9"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Select the date this job is required or scheduled for.
+                    </p>
+                  </div>
                   <div className="space-y-2">
                     <Label>Client *</Label>
                     <Select
@@ -499,17 +765,22 @@ export default function Jobs() {
                     </Select>
                   </div>
                   {selectedClient && (
-                    <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-                      <MapPin className="mr-2 inline h-4 w-4" />
-                      {selectedClient.district_name},{" "}
-                      {selectedClient.province_name}
+                    <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
+                      <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="font-medium">
+                        {selectedClient.district_name}
+                      </span>
+                      <Separator orientation="vertical" className="h-4" />
+                      <span className="text-muted-foreground">
+                        {selectedClient.province_name} Province
+                      </span>
                     </div>
                   )}
                 </>
               )}
               {currentStep.id === "hardware" && (
                 <>
-                  {jobType === "new" && (
+                  {(jobType === "smartboard" || jobType === "both") && (
                     <>
                       <div className="space-y-2">
                         <Label>Smartboard Model (optional)</Label>
@@ -520,7 +791,13 @@ export default function Jobs() {
                           }
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select smartboard model" />
+                            <SelectValue
+                              placeholder={
+                                data.smartboards.length
+                                  ? "Select smartboard model"
+                                  : "No smartboard models available"
+                              }
+                            />
                           </SelectTrigger>
                           <SelectContent>
                             {data.smartboards.map((item) => (
@@ -622,10 +899,17 @@ export default function Jobs() {
                     </Select>
                   </div>
                   {selectedRam && (
-                    <p className="text-sm text-muted-foreground">
-                      Selected memory: {selectedRam.brand || "Standard"}{" "}
-                      {selectedRam.ddr_version} {selectedRam.capacity_gb} GB
-                    </p>
+                    <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
+                      <MemoryStick className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="font-medium">
+                        {selectedRam.brand || "Standard"}
+                      </span>
+                      <Separator orientation="vertical" className="h-4" />
+                      <span className="text-muted-foreground">
+                        {selectedRam.ddr_version} &mdash;{" "}
+                        {selectedRam.capacity_gb} GB
+                      </span>
+                    </div>
                   )}
                 </>
               )}
@@ -633,23 +917,30 @@ export default function Jobs() {
                 <>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Storage requirements</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-medium">Storage drives</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         Add primary, secondary, or additional drives.
                       </p>
                     </div>
                     <Button
                       type="button"
                       variant="outline"
+                      size="sm"
                       onClick={addStorage}
-                      className="gap-2"
+                      className="gap-1.5"
                     >
-                      <Plus className="h-4 w-4" /> Add drive
+                      <Plus className="h-3.5 w-3.5" /> Add drive
                     </Button>
                   </div>
+                  {storageRequirements.length === 0 && (
+                    <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                      No drives added yet. Click &ldquo;Add drive&rdquo; to
+                      begin.
+                    </div>
+                  )}
                   {storageRequirements.map((requirement, index) => (
                     <div
-                      className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[140px_1fr_auto]"
+                      className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[130px_1fr_auto]"
                       key={`${requirement.role}-${index}`}
                     >
                       <Select
@@ -719,84 +1010,83 @@ export default function Jobs() {
               )}
               {currentStep.id === "software" && (
                 <div className="space-y-6">
-                  <div>
-                    <p className="mb-3 font-medium">Main software</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {data.mainSoftware.map((item) => (
-                        <label
-                          className="flex items-center gap-2 rounded-md border p-3 text-sm"
-                          key={item.id}
-                        >
-                          <Checkbox
-                            checked={mainSoftwareIds.includes(Number(item.id))}
-                            onCheckedChange={(checked) =>
-                              toggleSoftware(
-                                setMainSoftwareIds,
-                                Number(item.id),
-                                checked,
-                              )
-                            }
-                          />
-                          {item.name}
-                          {item.version ? ` ${item.version}` : ""}
-                        </label>
-                      ))}
+                  {[
+                    {
+                      label: "Main software",
+                      items: data.mainSoftware,
+                      ids: mainSoftwareIds,
+                      setter: setMainSoftwareIds,
+                    },
+                    {
+                      label: "Additional software",
+                      items: data.additionalSoftware,
+                      ids: additionalSoftwareIds,
+                      setter: setAdditionalSoftwareIds,
+                    },
+                  ].map(({ label, items, ids, setter }) => (
+                    <div key={label}>
+                      <p className="mb-3 text-sm font-medium">{label}</p>
+                      {items.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          None configured.
+                        </p>
+                      ) : (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {items.map((item) => (
+                            <Label
+                              key={item.id}
+                              className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm font-normal transition-colors hover:bg-muted/50 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
+                            >
+                              <Checkbox
+                                checked={ids.includes(Number(item.id))}
+                                onCheckedChange={(checked) =>
+                                  toggleSoftware(
+                                    setter,
+                                    Number(item.id),
+                                    checked,
+                                  )
+                                }
+                              />
+                              <span>
+                                {item.name}
+                                {item.version ? ` ${item.version}` : ""}
+                              </span>
+                            </Label>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div>
-                    <p className="mb-3 font-medium">Additional software</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {data.additionalSoftware.map((item) => (
-                        <label
-                          className="flex items-center gap-2 rounded-md border p-3 text-sm"
-                          key={item.id}
-                        >
-                          <Checkbox
-                            checked={additionalSoftwareIds.includes(
-                              Number(item.id),
-                            )}
-                            onCheckedChange={(checked) =>
-                              toggleSoftware(
-                                setAdditionalSoftwareIds,
-                                Number(item.id),
-                                checked,
-                              )
-                            }
-                          />
-                          {item.name}
-                          {item.version ? ` ${item.version}` : ""}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+                  ))}
                 </div>
               )}
               {currentStep.id === "review" && (
                 <div className="space-y-4">
                   {jobType === "smartboard" ? (
                     <div className="space-y-3">
-                      <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-5 dark:border-sky-800 dark:bg-sky-950/30">
-                        <p className="text-xs font-medium uppercase tracking-wide text-sky-600">
+                      <div className="rounded-xl border p-5">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                           Smartboard model
                         </p>
                         <p className="mt-2 text-xl font-semibold">
                           {selectedSmartboard?.model_name || "Not selected"}
                         </p>
-                        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                        <Separator className="my-3" />
+                        <p className="text-sm leading-6 text-muted-foreground">
                           {selectedSmartboard?.description ||
-                            "No model description is available in System Configuration."}
+                            "No model description available in System Configuration."}
                         </p>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        This simple job records the selected smartboard model
-                        for now. OPS requirements can be added later.
+                        This job records the selected smartboard model. OPS
+                        requirements can be added later.
                       </p>
                     </div>
                   ) : (
                     <>
-                      <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-2 sm:grid-cols-2">
                         {[
                           ["Client", selectedClient?.name],
+                          ["Required date", form.job_date],
                           ["District", selectedClient?.district_name],
                           [
                             "Smartboard",
@@ -817,50 +1107,48 @@ export default function Jobs() {
                             `${form.ram_ddr_version} ${form.ram_capacity_gb} GB`,
                           ],
                         ].map(([label, value]) => (
-                          <div
-                            className="rounded-lg border bg-muted/30 p-3"
-                            key={label}
-                          >
+                          <div className="rounded-lg border p-3" key={label}>
                             <p className="text-xs text-muted-foreground">
                               {label}
                             </p>
-                            <p className="mt-1 font-medium">
-                              {value || "Not selected"}
+                            <p className="mt-1 text-sm font-medium">
+                              {value || (
+                                <span className="text-muted-foreground italic">
+                                  Not selected
+                                </span>
+                              )}
                             </p>
                           </div>
                         ))}
                       </div>
+                      <Separator />
                       <div>
-                        <p className="mb-2 font-medium">Storage</p>
+                        <p className="mb-2 text-sm font-medium">Storage</p>
                         {selectedStorage.length ? (
-                          selectedStorage.map((item) => (
-                            <Badge
-                              className="mr-2"
-                              variant="secondary"
-                              key={item.id}
-                            >
-                              {item.storage_type}{" "}
-                              {item.capacity_gb >= 1024
-                                ? `${item.capacity_gb / 1024} TB`
-                                : `${item.capacity_gb} GB`}{" "}
-                              {item.interface}
-                            </Badge>
-                          ))
+                          <div className="flex flex-wrap gap-2">
+                            {selectedStorage.map((item) => (
+                              <Badge variant="secondary" key={item.id}>
+                                {item.storage_type}{" "}
+                                {item.capacity_gb >= 1024
+                                  ? `${item.capacity_gb / 1024} TB`
+                                  : `${item.capacity_gb} GB`}{" "}
+                                {item.interface}
+                              </Badge>
+                            ))}
+                          </div>
                         ) : (
                           <p className="text-sm text-muted-foreground">
                             No storage requirement
                           </p>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        Review the requirements before creating this job.
-                      </p>
                     </>
                   )}
                 </div>
               )}
             </CardContent>
-            <div className="flex justify-between border-t p-6">
+            <Separator />
+            <div className="flex justify-between p-4">
               <Button
                 type="button"
                 variant="outline"
