@@ -1,4 +1,5 @@
 import pool from "../config/db.config.js";
+import { logAction } from "../utils/audit.js";
 
 // ── GET /assembly/jobs ────────────────────────────────────────────────────────
 export const getAssemblyJobs = async (req, res) => {
@@ -234,6 +235,7 @@ export const startAssembly = async (req, res) => {
       await conn.query("UPDATE jobs SET status='assembly_in_progress' WHERE id=?", [job_id]);
 
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "assembly.started", entityType: "assembled_unit", entityId: result.insertId, details: { job_id, ops_inventory_id }, req });
     res.json({ Status: true, unit_id: result.insertId });
   } catch (err) {
     await conn.rollback();
@@ -258,6 +260,7 @@ export const addRam = async (req, res) => {
       [req.params.unitId, ram_inventory_id]);
     // trigger handles status update
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "assembly.ram_added", entityType: "assembled_unit", entityId: Number(req.params.unitId), details: { ram_inventory_id }, req });
     res.json({ Status: true });
   } catch (err) {
     await conn.rollback();
@@ -296,6 +299,7 @@ export const addStorage = async (req, res) => {
       [req.params.unitId, storage_inventory_id, role]);
     // trigger handles status update
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "assembly.storage_added", entityType: "assembled_unit", entityId: Number(req.params.unitId), details: { storage_inventory_id, role }, req });
     res.json({ Status: true });
   } catch (err) {
     await conn.rollback();
@@ -342,6 +346,7 @@ export const setWifi = async (req, res) => {
     await conn.query("UPDATE assembled_units SET wifi_card_inventory_id=? WHERE id=?",
       [wifi_card_inventory_id || null, req.params.unitId]);
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "assembly.wifi_updated", entityType: "assembled_unit", entityId: Number(req.params.unitId), details: { wifi_card_inventory_id: wifi_card_inventory_id || null }, req });
     res.json({ Status: true });
   } catch (err) {
     await conn.rollback();
@@ -389,6 +394,7 @@ export const addSoftware = async (req, res) => {
        [req.params.unitId, software_catalog_id, keyId]);
 
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "assembly.software_assigned", entityType: "assembled_unit", entityId: Number(req.params.unitId), details: { software_catalog_id, software_key_id: keyId }, req });
     res.json({ Status: true, key_id: keyId });
   } catch (err) {
     await conn.rollback();
@@ -414,6 +420,7 @@ export const removeSoftware = async (req, res) => {
         [req.params.unitId, req.params.catalogId]);
     }
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "assembly.smartboard_completed", entityType: "job", entityId: Number(job_id), req });
     res.json({ Status: true });
   } catch (err) {
     await conn.rollback();
@@ -434,6 +441,7 @@ export const completeSmartboardJob = async (req, res) => {
     if (job.job_type !== "smartboard") throw new Error("Use unit complete for non-smartboard jobs");
     await conn.query("UPDATE jobs SET status='ready_for_delivery' WHERE id=?", [job_id]);
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "assembly.completed", entityType: "assembled_unit", entityId: Number(req.params.unitId), details: { job_id: unit.job_id }, req });
     res.json({ Status: true });
   } catch (err) {
     await conn.rollback();

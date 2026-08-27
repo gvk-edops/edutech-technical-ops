@@ -29,3 +29,4 @@ const requireRole = (...roles) => [
 export const verifyAdmin      = requireRole('admin');
 export const verifyManager    = requireRole('admin', 'manager');
 export const verifyTechnician = requireRole('admin', 'manager', 'technician');
+export const verifyAuditor    = requireRole('auditor');

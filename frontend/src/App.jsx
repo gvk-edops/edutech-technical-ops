@@ -12,12 +12,14 @@ import Assembly from "./components/Assembly";
 import AfterService from "./components/AfterService";
 import Delivery from "./components/Delivery";
 import SoftwareKeys from "./components/SoftwareKeys";
+import AuditPortal from "./components/AuditPortal";
 
 function App() {
   return (
     <>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/audit" element={<AuditPortal />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
 
         <Route path="/app" element={<DashboardLayout />}>

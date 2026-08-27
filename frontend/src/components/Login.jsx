@@ -18,7 +18,7 @@ const Login = () => {
       const { data } = await axios.post(`${API_URL}/auth/login`, values);
       if (data.loginStatus) {
         toast.success(`Welcome, ${data.full_name}!`);
-        navigate('/app/dashboard');
+        navigate(data.role === 'auditor' ? '/audit' : '/app/dashboard');
       } else {
         toast.error(data.Error);
       }

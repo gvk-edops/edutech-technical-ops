@@ -9,6 +9,7 @@ import {
   Monitor,
   Package,
   Plus,
+  Pencil,
   Trash2,
   Cpu,
   MemoryStick,
@@ -207,6 +208,7 @@ export default function Jobs() {
   const [jobs, setJobs] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [afterServiceJob, setAfterServiceJob] = useState(null);
+  const [editingJob, setEditingJob] = useState(null);
   const activeSteps =
     jobType === "smartboard" ? [steps[0], steps[1], steps[5]] : steps;
   const currentStep = activeSteps[step];
@@ -336,12 +338,62 @@ export default function Jobs() {
         : currentIds.filter((value) => value !== id),
     );
 
+  const resetJobForm = () => {
+    setForm(emptyForm);
+    setStorageRequirements([]);
+    setMainSoftwareIds([]);
+    setAdditionalSoftwareIds([]);
+    setStep(0);
+    setJobType("");
+    setEditingJob(null);
+  };
+
+  const startNewJob = () => {
+    resetJobForm();
+    setWorkspaceTab("create");
+    setScreen("type");
+  };
+
+  const startEditingJob = (job) => {
+    setEditingJob(job);
+    setForm({
+      job_date: job.required_date ? String(job.required_date).slice(0, 10) : "",
+      client_id: String(job.client_id || ""),
+      smartboard_model_id: job.smartboard_model_id ? String(job.smartboard_model_id) : "",
+      smartboard_count: String(job.smartboard_count || 1),
+      ops_model_id: job.ops_model_id ? String(job.ops_model_id) : "",
+      ram_ddr_version: job.ram_ddr_version || "",
+      ram_capacity_gb: job.ram_capacity_gb ? String(job.ram_capacity_gb) : "",
+    });
+    setStorageRequirements((job.storage_requirements || []).map((item) => ({
+      role: item.role,
+      storage_spec_id: String(item.storage_spec_id),
+    })));
+    setMainSoftwareIds((job.main_software || []).map((item) => Number(item.software_catalog_id)));
+    setAdditionalSoftwareIds((job.additional_software || []).map((item) => Number(item.software_id)));
+    setJobType(job.job_type);
+    setStep(0);
+    setWorkspaceTab("create");
+    setScreen("wizard");
+  };
+
+  const deleteJob = async (job) => {
+    if (!window.confirm(`Delete ${job.job_number}? This cannot be undone.`)) return;
+    try {
+      await axios.delete(`${API_URL}/jobs/${job.id}`);
+      toast.success("Job deleted");
+      loadJobs();
+    } catch (errorResponse) {
+      toast.error(errorResponse.response?.data?.Error || "Could not delete job");
+    }
+  };
+
   const submit = async () => {
     const error = validateStep();
     if (error) return toast.error(error);
     setSaving(true);
     try {
-      const response = await axios.post(`${API_URL}/jobs`, {
+      const payload = {
         ...form,
         job_type: jobType,
         job_date: form.job_date,
@@ -362,19 +414,17 @@ export default function Jobs() {
         })),
         main_software_ids: mainSoftwareIds,
         additional_software_ids: additionalSoftwareIds,
-      });
-      toast.success(`${response.data.job_number} created`);
-      setForm(emptyForm);
-      setStorageRequirements([]);
-      setMainSoftwareIds([]);
-      setAdditionalSoftwareIds([]);
-      setStep(0);
-      setJobType("");
+      };
+      const response = editingJob
+        ? await axios.patch(`${API_URL}/jobs/${editingJob.id}`, payload)
+        : await axios.post(`${API_URL}/jobs`, payload);
+      toast.success(editingJob ? "Job updated" : `${response.data.job_number} created`);
+      resetJobForm();
       setScreen("overview");
       loadJobs();
     } catch (errorResponse) {
       toast.error(
-        errorResponse.response?.data?.Error || "Could not create job",
+        errorResponse.response?.data?.Error || `Could not ${editingJob ? "update" : "create"} job`,
       );
     } finally {
       setSaving(false);
@@ -452,10 +502,7 @@ export default function Jobs() {
               </p>
             </div>
             <Button
-              onClick={() => {
-                setWorkspaceTab("create");
-                setScreen("type");
-              }}
+              onClick={startNewJob}
               className="gap-2"
             >
               <Plus className="h-4 w-4" /> New Job
@@ -593,7 +640,18 @@ export default function Jobs() {
                       <span className="text-[11px] text-muted-foreground">
                         Created by {job.created_by_name || "—"} · {new Date(job.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                       </span>
-                      {job.job_type !== "smartboard" && job.status === "completed" && (
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {job.status === "created" && (
+                          <>
+                            <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => startEditingJob(job)}>
+                              <Pencil className="h-3.5 w-3.5" /> Edit
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" aria-label={`Delete ${job.job_number}`} onClick={() => deleteJob(job)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        )}
+                        {job.job_type !== "smartboard" && job.status === "completed" && (
                         <div className="flex items-center gap-1.5 shrink-0">
                           <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground"
                             onClick={(e) => { e.stopPropagation(); navigate(`/app/afterservice?job=${job.id}`); }}>
@@ -604,7 +662,8 @@ export default function Jobs() {
                             <HeartPulse className="h-3.5 w-3.5" /> Create
                           </Button>
                         </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -675,7 +734,7 @@ export default function Jobs() {
                   Choose the workflow that matches the request.
                 </p>
               </div>
-              <Button onClick={() => setScreen("type")} className="gap-2">
+              <Button onClick={startNewJob} className="gap-2">
                 Create Job <ChevronRight className="h-4 w-4" />
               </Button>
             </CardContent>
@@ -771,17 +830,20 @@ export default function Jobs() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setScreen("type")}
+              onClick={() => {
+                setEditingJob(null);
+                setScreen("type");
+              }}
               className="h-8 w-8"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div>
               <h2 className="text-xl font-semibold tracking-tight">
-                Create Job
+                {editingJob ? "Edit Job" : "Create Job"}
               </h2>
               <p className="text-xs text-muted-foreground">
-                Define the build requirements step by step.
+                {editingJob ? "Update the requirements before assembly starts." : "Define the build requirements step by step."}
               </p>
             </div>
           </div>
@@ -1315,7 +1377,7 @@ export default function Jobs() {
                   disabled={saving}
                   className="gap-2"
                 >
-                  {saving ? "Creating..." : "Create Job"}{" "}
+                  {saving ? (editingJob ? "Saving..." : "Creating...") : (editingJob ? "Save Changes" : "Create Job")} {" "}
                   <Check className="h-4 w-4" />
                 </Button>
               )}

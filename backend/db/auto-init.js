@@ -92,6 +92,9 @@ async function autoInitialize() {
     await conn.query(
       "ALTER TABLE jobs MODIFY ram_capacity_gb SMALLINT UNSIGNED NULL",
     );
+    await conn.query(
+      "ALTER TABLE users MODIFY role ENUM('admin','manager','technician','auditor') NOT NULL DEFAULT 'technician'",
+    );
     await conn.end();
     return;
   }

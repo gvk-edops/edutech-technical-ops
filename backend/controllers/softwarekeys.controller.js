@@ -1,4 +1,5 @@
 import pool from "../config/db.config.js";
+import { logAction } from "../utils/audit.js";
 
 // GET /software-keys?status=&software_catalog_id=&search=
 export const getSoftwareKeys = async (req, res) => {
@@ -75,6 +76,7 @@ export const createSoftwareKey = async (req, res) => {
       licenseType === "subscription" ? subscriptionEndDate : null,
       notes?.trim() || null,
     ]);
+    void logAction({ userId: req.user.id, action: "software_key.created", entityType: "software_key", entityId: result.insertId, details: { software_catalog_id: catalogId, license_type: licenseType }, req });
     res.status(201).json({ Status: true, id: result.insertId });
   } catch (err) {
     const message = err.code === "ER_DUP_ENTRY" ? "This license key already exists" : err.message;

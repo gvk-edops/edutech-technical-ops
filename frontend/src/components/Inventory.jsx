@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Cpu, HardDrive, MemoryStick, Wifi, Plus, Upload, Search,
-  RefreshCw, ChevronDown, ChevronRight, X,
+  RefreshCw, ChevronDown, ChevronRight, Pencil, Trash2, X,
 } from "lucide-react";
 import axios from "@/utils/axios";
 import { API_URL } from "@/lib/api";
@@ -307,6 +307,9 @@ export default function Inventory() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [singleForm, setSingleForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
 
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchText, setBatchText] = useState("");
@@ -409,6 +412,39 @@ export default function Inventory() {
       toast.success("Status updated");
       reload();
     } catch (e) { toast.error(e.response?.data?.Error || "Failed to update status"); }
+  };
+
+  const openEdit = (item) => {
+    setEditItem(item);
+    setEditForm({
+      spec_id: String(item[SPEC_KEY[activeType]] || ""),
+      serial_number: item.serial_number || "",
+      motherboard_serial: item.motherboard_serial || "",
+      brand: item.brand || "",
+      notes: item.notes || "",
+    });
+  };
+
+  const submitEdit = async () => {
+    if (!editForm.spec_id || !editForm.serial_number?.trim()) return toast.error("Spec and serial number are required");
+    if (activeType === "ops" && !editForm.motherboard_serial?.trim()) return toast.error("Motherboard serial is required for OPS");
+    setEditSaving(true);
+    try {
+      await axios.patch(`${API_URL}/inventory/${activeType}/${editItem.id}`, editForm);
+      toast.success("Inventory item updated");
+      setEditItem(null);
+      reload();
+    } catch (e) { toast.error(e.response?.data?.Error || "Failed to update item"); }
+    finally { setEditSaving(false); }
+  };
+
+  const removeItem = async (item) => {
+    if (!window.confirm(`Remove ${item.serial_number}? This cannot be undone.`)) return;
+    try {
+      await axios.delete(`${API_URL}/inventory/${activeType}/${item.id}`);
+      toast.success("Inventory item removed");
+      reload();
+    } catch (e) { toast.error(e.response?.data?.Error || "Failed to remove item"); }
   };
 
   // ── filtered list ────────────────────────────────────────────────────────────
@@ -553,20 +589,30 @@ export default function Inventory() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-                              Status <ChevronDown className="h-3 w-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {STATUSES.filter((s) => s !== item.status && s !== "assigned").map((s) => (
-                              <DropdownMenuItem key={s} onClick={() => changeStatus(item, s)} className="capitalize text-sm">
-                                {s.replace("_", " ")}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex justify-end gap-1">
+                          {item.status !== "assigned" && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+                                  Status <ChevronDown className="h-3 w-3" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {STATUSES.filter((s) => s !== item.status && s !== "assigned").map((s) => (
+                                  <DropdownMenuItem key={s} onClick={() => changeStatus(item, s)} className="capitalize text-sm">
+                                    {s.replace("_", " ")}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={item.status === "assigned"} title="Edit item" onClick={() => openEdit(item)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" disabled={item.status === "assigned"} title="Remove item" onClick={() => removeItem(item)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

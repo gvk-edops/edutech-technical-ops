@@ -8,7 +8,7 @@ import { verifyToken, verifyAdmin } from '../middleware/auth.js';
 const router = express.Router();
 
 router.post('/login', login);
-router.post('/logout', logout);
+router.post('/logout', verifyToken, logout);
 router.get('/me', verifyToken, me);
 router.put('/change-password', verifyToken, changeOwnPassword);
 

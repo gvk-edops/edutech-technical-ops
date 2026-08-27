@@ -13,7 +13,7 @@ import { User, Settings, LogOut } from 'lucide-react';
 import axios from '@/utils/axios';
 import { toast } from 'sonner';
 
-const roleBadge = { admin: 'bg-red-100 text-red-800', manager: 'bg-blue-100 text-blue-800', technician: 'bg-green-100 text-green-800' };
+const roleBadge = { admin: 'bg-red-100 text-red-800', manager: 'bg-blue-100 text-blue-800', technician: 'bg-green-100 text-green-800', auditor: 'bg-slate-100 text-slate-800' };
 
 const sectionTitle = (path) => {
   if (path.startsWith('/app/dashboard')) return 'Dashboard';

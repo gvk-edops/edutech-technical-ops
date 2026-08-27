@@ -1,4 +1,5 @@
 import pool from "../config/db.config.js";
+import { logAction } from "../utils/audit.js";
 
 // GET /delivery/jobs — jobs that are ready to leave the workshop
 export const getDeliveryJobs = async (req, res) => {
@@ -74,6 +75,7 @@ export const confirmDelivery = async (req, res) => {
     if (job.job_type === "smartboard") {
       await conn.query("UPDATE jobs SET status='completed' WHERE id=?", [job.id]);
       await conn.commit();
+      void logAction({ userId: req.user.id, action: "delivery.confirmed", entityType: "job", entityId: job.id, details: { job_type: job.job_type, delivered_count: 0 }, req });
       return res.json({ Status: true, delivered_count: 0, job_completed: true });
     }
 
@@ -102,6 +104,7 @@ export const confirmDelivery = async (req, res) => {
     if (jobCompleted) await conn.query("UPDATE jobs SET status='completed' WHERE id=?", [job.id]);
 
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "delivery.confirmed", entityType: "job", entityId: job.id, details: { unit_ids: ids, delivered_count: ids.length, job_completed: jobCompleted }, req });
     res.json({ Status: true, delivered_count: ids.length, job_completed: jobCompleted });
   } catch (err) {
     await conn.rollback();

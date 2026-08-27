@@ -16,7 +16,7 @@ CREATE TABLE users (
     password_hash   VARCHAR(255) NOT NULL,
     full_name       VARCHAR(100) NOT NULL,
     email           VARCHAR(100) NULL,
-    role            ENUM('admin','manager','technician') NOT NULL DEFAULT 'technician',
+    role            ENUM('admin','manager','technician','auditor') NOT NULL DEFAULT 'technician',
     is_active       TINYINT(1) NOT NULL DEFAULT 1,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

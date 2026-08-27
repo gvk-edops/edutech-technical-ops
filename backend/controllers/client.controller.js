@@ -1,4 +1,5 @@
 import pool from "../config/db.config.js";
+import { logAction } from "../utils/audit.js";
 
 export const getLocations = async (req, res) => {
   try {
@@ -47,6 +48,7 @@ export const createClient = async (req, res) => {
         email?.trim() || null,
       ],
     );
+    void logAction({ userId: req.user.id, action: "client.created", entityType: "client", entityId: result.insertId, details: { name: name.trim(), district_id }, req });
     res.json({ Status: true, id: result.insertId });
   } catch (err) {
     res.status(500).json({ Status: false, Error: err.message });
@@ -72,6 +74,7 @@ export const updateClient = async (req, res) => {
         req.params.id,
       ],
     );
+    void logAction({ userId: req.user.id, action: "client.updated", entityType: "client", entityId: Number(req.params.id), details: { name: name.trim(), district_id }, req });
     res.json({ Status: true });
   } catch (err) {
     res.status(500).json({ Status: false, Error: err.message });
@@ -81,6 +84,7 @@ export const updateClient = async (req, res) => {
 export const deleteClient = async (req, res) => {
   try {
     await pool.query("DELETE FROM clients WHERE id=?", [req.params.id]);
+    void logAction({ userId: req.user.id, action: "client.deleted", entityType: "client", entityId: Number(req.params.id), req });
     res.json({ Status: true });
   } catch (err) {
     res.status(500).json({ Status: false, Error: err.message });

@@ -1,4 +1,5 @@
 import pool from "../config/db.config.js";
+import { logAction } from "../utils/audit.js";
 
 // Map of route key → { table, fields }
 const CATALOGS = {
@@ -160,6 +161,7 @@ export const create = async (req, res) => {
           : `INSERT INTO ${table} (name, version, description) VALUES (?,?,?)`,
         [req.body.name, req.body.version || null, req.body.description || null],
       );
+      void logAction({ userId: req.user.id, action: "catalog.created", entityType: `software_${req.body.software_type}`, entityId: result.insertId, req });
       return res.json({
         Status: true,
         id: `${req.body.software_type}:${result.insertId}`,
@@ -167,6 +169,7 @@ export const create = async (req, res) => {
     }
     const [sql, params] = cat.insert(req.body);
     const [result] = await pool.query(sql, params);
+    void logAction({ userId: req.user.id, action: "catalog.created", entityType: req.params.catalog, entityId: result.insertId, req });
     res.json({ Status: true, id: result.insertId });
   } catch (err) {
     res.status(500).json({ Status: false, Error: err.message });
@@ -194,10 +197,12 @@ export const update = async (req, res) => {
           id,
         ],
       );
+      void logAction({ userId: req.user.id, action: "catalog.updated", entityType: `software_${type}`, entityId: Number(id), req });
       return res.json({ Status: true });
     }
     const [sql, params] = cat.update(req.body, req.params.id);
     await pool.query(sql, params);
+    void logAction({ userId: req.user.id, action: "catalog.updated", entityType: req.params.catalog, entityId: Number(req.params.id), req });
     res.json({ Status: true });
   } catch (err) {
     res.status(500).json({ Status: false, Error: err.message });
@@ -217,9 +222,11 @@ export const remove = async (req, res) => {
           .status(400)
           .json({ Status: false, Error: "Invalid software id" });
       await pool.query(`DELETE FROM ${table} WHERE id = ?`, [id]);
+      void logAction({ userId: req.user.id, action: "catalog.deleted", entityType: `software_${type}`, entityId: Number(id), req });
       return res.json({ Status: true });
     }
     await pool.query(`DELETE FROM ${cat.table} WHERE id = ?`, [req.params.id]);
+    void logAction({ userId: req.user.id, action: "catalog.deleted", entityType: req.params.catalog, entityId: Number(req.params.id), req });
     res.json({ Status: true });
   } catch (err) {
     res.status(500).json({ Status: false, Error: err.message });

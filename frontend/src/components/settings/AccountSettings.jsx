@@ -12,8 +12,8 @@ import axios from '@/utils/axios';
 import { API_URL } from '@/lib/api';
 import { toast } from 'sonner';
 
-const ROLES = ['admin', 'manager', 'technician'];
-const roleBadge = { admin: 'bg-red-100 text-red-800', manager: 'bg-blue-100 text-blue-800', technician: 'bg-green-100 text-green-800' };
+const ROLES = ['admin', 'manager', 'technician', 'auditor'];
+const roleBadge = { admin: 'bg-red-100 text-red-800', manager: 'bg-blue-100 text-blue-800', technician: 'bg-green-100 text-green-800', auditor: 'bg-slate-100 text-slate-800' };
 
 export default function AccountSettings() {
   const navigate = useNavigate();
@@ -38,14 +38,14 @@ export default function AccountSettings() {
     try {
       const { data } = await axios.get(`${API_URL}/auth/me`);
       if (data.Status) setMe(data.user);
-    } catch {}
+    } catch { setMe(null); }
   };
 
   const fetchUsers = async () => {
     try {
       const { data } = await axios.get(`${API_URL}/auth/users`);
       if (data.Status) setUsers(data.data);
-    } catch {}
+    } catch { setUsers([]); }
   };
 
   const handlePasswordChange = async (e) => {
@@ -163,7 +163,7 @@ export default function AccountSettings() {
                   <UserPlus className="h-4 w-4 mr-2" /> Add User
                 </Button>
               </div>
-              <CardDescription>Manage admin, manager, and technician accounts</CardDescription>
+              <CardDescription>Manage operational users and isolated auditor accounts</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">

@@ -1,4 +1,5 @@
 import pool from "../config/db.config.js";
+import { logAction } from "../utils/audit.js";
 
 const nextRepairNumber = async (conn) => {
   const year = new Date().getFullYear();
@@ -229,6 +230,7 @@ export const createRepair = async (req, res) => {
     );
     await conn.query("UPDATE assembled_units SET status='in_repair' WHERE id=?", [assembled_unit_id]);
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "repair.created", entityType: "repair_job", entityId: result.insertId, details: { repair_number: repairNumber, assembled_unit_id }, req });
     res.json({ Status: true, id: result.insertId, repair_number: repairNumber });
   } catch (err) {
     await conn.rollback();
@@ -261,6 +263,7 @@ export const updateStatus = async (req, res) => {
       await conn.query("UPDATE assembled_units SET status='delivered' WHERE id=?", [rj.assembled_unit_id]);
 
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "repair.status_updated", entityType: "repair_job", entityId: Number(req.params.id), details: { status }, req });
     res.json({ Status: true });
   } catch (err) {
     await conn.rollback();
@@ -351,6 +354,7 @@ export const logReplacement = async (req, res) => {
     }
 
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "repair.component_replaced", entityType: "repair_job", entityId: Number(req.params.id), details: { component_type, old_inventory_id: old_inventory_id || null, new_inventory_id: new_inventory_id || null }, req });
     res.json({ Status: true });
   } catch (err) {
     await conn.rollback();

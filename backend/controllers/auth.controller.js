@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import 'dotenv/config';
 import pool from '../config/db.config.js';
+import { logAction } from '../utils/audit.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'jwt_secret_key';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
@@ -27,6 +28,7 @@ export const login = async (req, res) => {
       { expiresIn: JWT_EXPIRES_IN }
     );
     res.cookie('token', token, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 8 * 3600000 });
+    void logAction({ userId: user.id, action: 'auth.login', entityType: 'user', entityId: user.id, details: { username: user.username, role: user.role }, req });
     return res.json({ loginStatus: true, role: user.role, full_name: user.full_name });
   } catch (err) {
     console.error(err);
@@ -35,6 +37,7 @@ export const login = async (req, res) => {
 };
 
 export const logout = (req, res) => {
+  void logAction({ userId: req.user?.id, action: 'auth.logout', entityType: 'user', entityId: req.user?.id, req });
   res.clearCookie('token', { httpOnly: true, secure: true, sameSite: 'none' });
   return res.json({ Status: true });
 };
@@ -69,6 +72,7 @@ export const createUser = async (req, res) => {
       'INSERT INTO users (username, password_hash, full_name, email, role) VALUES (?, ?, ?, ?, ?)',
       [username, hash, full_name, email || null, role]
     );
+    void logAction({ userId: req.user.id, action: 'user.created', entityType: 'user', entityId: result.insertId, details: { username, role }, req });
     res.json({ Status: true, id: result.insertId });
   } catch (err) {
     res.status(500).json({ Status: false, Error: err.message });
@@ -88,6 +92,7 @@ export const updateUser = async (req, res) => {
       'UPDATE users SET full_name = ?, email = ?, role = ?, is_active = ? WHERE id = ?',
       [full_name, email || null, role, is_active ?? 1, id]
     );
+    void logAction({ userId: req.user.id, action: 'user.updated', entityType: 'user', entityId: Number(id), details: { role, is_active }, req });
     res.json({ Status: true });
   } catch (err) {
     res.status(500).json({ Status: false, Error: err.message });
@@ -103,6 +108,7 @@ export const resetPassword = async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
     await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, id]);
+    void logAction({ userId: req.user.id, action: 'user.password_reset', entityType: 'user', entityId: Number(id), req });
     res.json({ Status: true });
   } catch (err) {
     res.status(500).json({ Status: false, Error: err.message });
@@ -123,6 +129,7 @@ export const changeOwnPassword = async (req, res) => {
 
     const hash = await bcrypt.hash(newPassword, 10);
     await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, req.user.id]);
+    void logAction({ userId: req.user.id, action: 'user.password_changed', entityType: 'user', entityId: req.user.id, req });
     res.json({ Status: true });
   } catch (err) {
     res.status(500).json({ Status: false, Error: err.message });
@@ -136,6 +143,7 @@ export const deleteUser = async (req, res) => {
       return res.status(400).json({ Status: false, Error: 'Cannot delete your own account' });
 
     await pool.query('DELETE FROM users WHERE id = ?', [id]);
+    void logAction({ userId: req.user.id, action: 'user.deleted', entityType: 'user', entityId: Number(id), req });
     res.json({ Status: true });
   } catch (err) {
     res.status(500).json({ Status: false, Error: err.message });

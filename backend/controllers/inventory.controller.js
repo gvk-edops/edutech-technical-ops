@@ -1,4 +1,5 @@
 import pool from "../config/db.config.js";
+import { logAction } from "../utils/audit.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,24 @@ const specLabel = (type, row) => {
   if (type === "storage")
     return `${row.storage_type} ${row.form_factor} ${row.interface} ${row.capacity_gb >= 1024 ? row.capacity_gb / 1024 + "TB" : row.capacity_gb + "GB"}`;
   return row.model_name || row.spec_label || "";
+};
+
+const referenceTable = {
+  ops: { table: "assembled_units", column: "ops_inventory_id" },
+  ram: { table: "assembly_rams", column: "ram_inventory_id" },
+  storage: { table: "assembly_storage", column: "storage_inventory_id" },
+  network_card: { table: "assembled_units", column: "wifi_card_inventory_id" },
+};
+
+const ensureUnassigned = async (conn, type, id) => {
+  const t = TABLES[type];
+  const [[item]] = await conn.query(`SELECT id, status FROM ${t.inv} WHERE id=? FOR UPDATE`, [id]);
+  if (!item) throw new Error("Inventory item not found");
+  const ref = referenceTable[type];
+  const [[usage]] = await conn.query(`SELECT COUNT(*) AS count FROM ${ref.table} WHERE ${ref.column}=?`, [id]);
+  if (item.status === "assigned" || usage.count > 0)
+    throw new Error("Assigned inventory cannot be edited or removed");
+  return item;
 };
 
 // ── GET /inventory/:type ──────────────────────────────────────────────────────
@@ -144,6 +163,7 @@ export const addSingle = async (req, res) => {
     );
 
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "inventory.item_added", entityType: `inventory_${type}`, details: { serial_number: serial_number.trim(), spec_id, batch_id: batchId }, req });
     res.json({ Status: true });
   } catch (err) {
     await conn.rollback();
@@ -200,6 +220,7 @@ export const addBatch = async (req, res) => {
     }
 
     await conn.commit();
+    void logAction({ userId: req.user.id, action: "inventory.batch_added", entityType: `inventory_${type}`, details: { batch_id: batchId, inserted, rejected: errors.length }, req });
     res.json({ Status: true, inserted, errors });
   } catch (err) {
     await conn.rollback();
@@ -218,12 +239,68 @@ export const updateStatus = async (req, res) => {
   const valid = ["in_stock", "faulty", "retired", "reserved"];
   if (!valid.includes(status))
     return res.status(400).json({ Status: false, Error: "Invalid status" });
+  const conn = await pool.getConnection();
   try {
-    await pool.query(`UPDATE ${t.inv} SET status=? WHERE id=?`, [status, req.params.id]);
+    await conn.beginTransaction();
+    await ensureUnassigned(conn, req.params.type, req.params.id);
+    await conn.query(`UPDATE ${t.inv} SET status=? WHERE id=?`, [status, req.params.id]);
+    await conn.commit();
+    void logAction({ userId: req.user.id, action: "inventory.status_updated", entityType: `inventory_${req.params.type}`, entityId: Number(req.params.id), details: { status }, req });
     res.json({ Status: true });
   } catch (err) {
-    res.status(500).json({ Status: false, Error: err.message });
-  }
+    await conn.rollback();
+    res.status(400).json({ Status: false, Error: err.message });
+  } finally { conn.release(); }
+};
+
+// PATCH /inventory/:type/:id — edit unassigned stock metadata only.
+export const updateInventoryItem = async (req, res) => {
+  const type = req.params.type;
+  const t = TABLES[type];
+  if (!t) return res.status(404).json({ Status: false, Error: "Unknown type" });
+  const { serial_number, spec_id, notes, brand, motherboard_serial } = req.body;
+  if (!serial_number?.trim() || !spec_id)
+    return res.status(400).json({ Status: false, Error: "serial_number and spec_id are required" });
+  if (type === "ops" && !motherboard_serial?.trim())
+    return res.status(400).json({ Status: false, Error: "motherboard_serial is required for OPS" });
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await ensureUnassigned(conn, type, req.params.id);
+    const fields = [`serial_number=?`, `${t.specKey}=?`, "notes=?"];
+    const values = [serial_number.trim(), spec_id, notes?.trim() || null];
+    if (type === "ops") { fields.push("motherboard_serial=?"); values.push(motherboard_serial.trim()); }
+    if (type === "ram" || type === "storage") { fields.push("brand=?"); values.push(brand?.trim() || null); }
+    values.push(req.params.id);
+    await conn.query(`UPDATE ${t.inv} SET ${fields.join(", ")} WHERE id=?`, values);
+    await conn.commit();
+    void logAction({ userId: req.user.id, action: "inventory.item_updated", entityType: `inventory_${type}`, entityId: Number(req.params.id), details: { spec_id }, req });
+    res.json({ Status: true });
+  } catch (err) {
+    await conn.rollback();
+    const message = err.code === "ER_DUP_ENTRY" ? "Serial number already exists" : err.message;
+    res.status(400).json({ Status: false, Error: message });
+  } finally { conn.release(); }
+};
+
+// DELETE /inventory/:type/:id — only unassigned, never-used items can be removed.
+export const deleteInventoryItem = async (req, res) => {
+  const type = req.params.type;
+  const t = TABLES[type];
+  if (!t) return res.status(404).json({ Status: false, Error: "Unknown type" });
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await ensureUnassigned(conn, type, req.params.id);
+    await conn.query(`DELETE FROM ${t.inv} WHERE id=?`, [req.params.id]);
+    await conn.commit();
+    void logAction({ userId: req.user.id, action: "inventory.item_deleted", entityType: `inventory_${type}`, entityId: Number(req.params.id), req });
+    res.json({ Status: true });
+  } catch (err) {
+    await conn.rollback();
+    res.status(400).json({ Status: false, Error: err.message });
+  } finally { conn.release(); }
 };
 
 // ── GET /inventory/summary ────────────────────────────────────────────────────
