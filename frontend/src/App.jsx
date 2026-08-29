@@ -15,6 +15,7 @@ import SoftwareKeys from "./components/SoftwareKeys";
 import AuditPortal from "./components/AuditPortal";
 import Users from "./components/Users";
 import Reports from "./components/Reports";
+import Lending from "./components/Lending";
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
           <Route path="afterservice" element={<AfterService />} />
           <Route path="users" element={<Users />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="lending" element={<Lending />} />
 
           {/* TODO: add as implemented */}
           {/* <Route path="users"          element={<Users />} /> */}

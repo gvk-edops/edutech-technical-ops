@@ -163,7 +163,7 @@ CREATE TABLE inventory_ops (
     serial_number      VARCHAR(100) NOT NULL UNIQUE,
     motherboard_serial VARCHAR(100) NOT NULL UNIQUE,
     ops_model_id       INT UNSIGNED NOT NULL,
-    status             ENUM('in_stock','assigned','faulty','retired','reserved') NOT NULL DEFAULT 'in_stock',
+    status             ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock',
     batch_id           INT UNSIGNED NULL,
     notes              TEXT NULL,
     created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -180,7 +180,7 @@ CREATE TABLE inventory_rams (
     serial_number VARCHAR(100) NOT NULL UNIQUE,
     brand         VARCHAR(50)  NULL,
     ram_spec_id   INT UNSIGNED NOT NULL,
-    status        ENUM('in_stock','assigned','faulty','retired','reserved') NOT NULL DEFAULT 'in_stock',
+    status        ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock',
     batch_id      INT UNSIGNED NULL,
     notes         TEXT NULL,
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -197,7 +197,7 @@ CREATE TABLE inventory_storage (
     serial_number     VARCHAR(100) NOT NULL UNIQUE,
     brand             VARCHAR(50)  NULL,
     storage_spec_id   INT UNSIGNED NOT NULL,
-    status            ENUM('in_stock','assigned','faulty','retired','reserved') NOT NULL DEFAULT 'in_stock',
+    status            ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock',
     batch_id          INT UNSIGNED NULL,
     notes             TEXT NULL,
     created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -213,7 +213,7 @@ CREATE TABLE inventory_network_cards (
     id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     serial_number VARCHAR(100) NOT NULL UNIQUE,
     model_id      INT UNSIGNED NOT NULL,
-    status        ENUM('in_stock','assigned','faulty','retired','reserved') NOT NULL DEFAULT 'in_stock',
+    status        ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock',
     batch_id      INT UNSIGNED NULL,
     notes         TEXT NULL,
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -442,6 +442,21 @@ CREATE TABLE ops_replacements (
 ) ENGINE=InnoDB;
 
 -- =====================================================
+-- 29.5. TECHNICIAN BORROWINGS
+-- =====================================================
+CREATE TABLE technician_borrowings (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    technician_id INT UNSIGNED NOT NULL,
+    component_type ENUM('ops', 'ram', 'storage', 'network_card') NOT NULL,
+    inventory_id INT UNSIGNED NOT NULL,
+    borrowed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    returned_at DATETIME NULL,
+    status ENUM('borrowed', 'returned', 'consumed') NOT NULL DEFAULT 'borrowed',
+    notes TEXT NULL,
+    CONSTRAINT fk_borrowings_technician FOREIGN KEY (technician_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- =====================================================
 -- 30. AUDIT LOG
 -- =====================================================
 CREATE TABLE audit_logs (
@@ -554,6 +569,15 @@ BEGIN
     ELSEIF NEW.component_type = 'software_key' AND NEW.new_inventory_id IS NOT NULL THEN
         UPDATE main_software_keys SET status = 'assigned' WHERE id = NEW.new_inventory_id;
     END IF;
+
+    -- Mark active borrowing as consumed if the component was borrowed
+    IF NEW.new_inventory_id IS NOT NULL THEN
+        UPDATE technician_borrowings 
+        SET status = 'consumed' 
+        WHERE component_type = NEW.component_type 
+          AND inventory_id = NEW.new_inventory_id 
+          AND status = 'borrowed';
+    END IF;
 END//
 DELIMITER ;
 
@@ -571,3 +595,6 @@ CREATE INDEX idx_inventory_storage_status ON inventory_storage (status);
 CREATE INDEX idx_inventory_net_status ON inventory_network_cards (status);
 CREATE INDEX idx_assembly_main_sw_unit ON assembly_main_software (assembled_unit_id, is_active);
 CREATE INDEX idx_audit_created_at ON audit_logs (created_at);
+CREATE INDEX idx_borrowings_status ON technician_borrowings(status);
+CREATE INDEX idx_borrowings_tech ON technician_borrowings(technician_id);
+CREATE INDEX idx_borrowings_comp ON technician_borrowings(component_type, inventory_id);

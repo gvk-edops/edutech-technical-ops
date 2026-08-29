@@ -116,7 +116,7 @@ function StepShell({ stepIndex, children, onBack, onNext, nextLabel = "Continue"
 
 // ── Step 0: OPS ────────────────────────────────────────────────────────────────
 
-function StepOps({ job, onStarted }) {
+function StepOps({ job, onBack, onStarted }) {
   const [available, setAvailable] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -157,7 +157,7 @@ function StepOps({ job, onStarted }) {
   };
 
   return (
-    <StepShell stepIndex={0} onBack={() => {}} onNext={handleStart} nextLabel="Continue" nextDisabled={!selected} saving={saving}>
+    <StepShell stepIndex={0} onBack={onBack} onNext={handleStart} nextLabel="Continue" nextDisabled={!selected} saving={saving}>
       <div className="space-y-1.5">
         <Label>Scan OPS Serial Number</Label>
         <ScanInput
@@ -695,7 +695,7 @@ function UnitWizard({ job, onBack, onUnitDone }) {
 
       {/* OPS step — only for ops/both */}
       {!isSmartboardOnly && step === 0 && (
-        <StepOps job={job} onStarted={(id, ops) => { setUnitId(id); setOpsSerial(ops.serial_number); setStep(1); }} />
+        <StepOps job={job} onBack={() => handleStep(-1)} onStarted={(id, ops) => { setUnitId(id); setOpsSerial(ops.serial_number); setStep(1); }} />
       )}
       {!isSmartboardOnly && step === 1 && unitId && (
         <StepRam job={job} unitId={unitId} onDone={handleStep} />

@@ -69,6 +69,61 @@ async function autoInitialize() {
       { sql: "ALTER TABLE ram_specs DROP COLUMN brand", msg: "Removed RAM brand column" },
       { sql: "ALTER TABLE ram_specs ADD COLUMN bus_speed_mhz INT NULL AFTER capacity_gb", msg: "Added RAM bus_speed_mhz column" },
       { sql: "ALTER TABLE jobs ADD COLUMN required_date DATE NULL AFTER ram_capacity_gb", msg: "Added jobs required_date column" },
+      { sql: "ALTER TABLE inventory_ops MODIFY COLUMN status ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock'", msg: "Updated inventory_ops status ENUM" },
+      { sql: "ALTER TABLE inventory_rams MODIFY COLUMN status ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock'", msg: "Updated inventory_rams status ENUM" },
+      { sql: "ALTER TABLE inventory_storage MODIFY COLUMN status ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock'", msg: "Updated inventory_storage status ENUM" },
+      { sql: "ALTER TABLE inventory_network_cards MODIFY COLUMN status ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock'", msg: "Updated inventory_network_cards status ENUM" },
+      { sql: `CREATE TABLE IF NOT EXISTS technician_borrowings (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    technician_id INT UNSIGNED NOT NULL,
+    component_type ENUM('ops', 'ram', 'storage', 'network_card') NOT NULL,
+    inventory_id INT UNSIGNED NOT NULL,
+    borrowed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    returned_at DATETIME NULL,
+    status ENUM('borrowed', 'returned', 'consumed') NOT NULL DEFAULT 'borrowed',
+    notes TEXT NULL,
+    CONSTRAINT fk_borrowings_technician FOREIGN KEY (technician_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB`, msg: "Created technician_borrowings table" },
+      { sql: "DROP TRIGGER IF EXISTS trg_repair_component_replacements_insert", msg: "Drop old trigger" },
+      { sql: `CREATE TRIGGER trg_repair_component_replacements_insert
+      AFTER INSERT ON repair_component_replacements
+      FOR EACH ROW
+      BEGIN
+          -- Set old component to 'faulty'
+          IF NEW.component_type = 'ops' AND NEW.old_inventory_id IS NOT NULL THEN
+              UPDATE inventory_ops SET status = 'faulty' WHERE id = NEW.old_inventory_id;
+          ELSEIF NEW.component_type = 'ram' AND NEW.old_inventory_id IS NOT NULL THEN
+              UPDATE inventory_rams SET status = 'faulty' WHERE id = NEW.old_inventory_id;
+          ELSEIF NEW.component_type = 'storage' AND NEW.old_inventory_id IS NOT NULL THEN
+              UPDATE inventory_storage SET status = 'faulty' WHERE id = NEW.old_inventory_id;
+          ELSEIF NEW.component_type = 'wifi_card' AND NEW.old_inventory_id IS NOT NULL THEN
+              UPDATE inventory_network_cards SET status = 'faulty' WHERE id = NEW.old_inventory_id;
+          ELSEIF NEW.component_type = 'software_key' AND NEW.old_inventory_id IS NOT NULL THEN
+              UPDATE main_software_keys SET status = 'revoked' WHERE id = NEW.old_inventory_id;
+          END IF;
+      
+          -- Set new component to 'assigned'
+          IF NEW.component_type = 'ops' AND NEW.new_inventory_id IS NOT NULL THEN
+              UPDATE inventory_ops SET status = 'assigned' WHERE id = NEW.new_inventory_id;
+          ELSEIF NEW.component_type = 'ram' AND NEW.new_inventory_id IS NOT NULL THEN
+              UPDATE inventory_rams SET status = 'assigned' WHERE id = NEW.new_inventory_id;
+          ELSEIF NEW.component_type = 'storage' AND NEW.new_inventory_id IS NOT NULL THEN
+              UPDATE inventory_storage SET status = 'assigned' WHERE id = NEW.new_inventory_id;
+          ELSEIF NEW.component_type = 'wifi_card' AND NEW.new_inventory_id IS NOT NULL THEN
+              UPDATE inventory_network_cards SET status = 'assigned' WHERE id = NEW.new_inventory_id;
+          ELSEIF NEW.component_type = 'software_key' AND NEW.new_inventory_id IS NOT NULL THEN
+              UPDATE main_software_keys SET status = 'assigned' WHERE id = NEW.new_inventory_id;
+          END IF;
+
+          -- Mark active borrowing as consumed if the component was borrowed
+          IF NEW.new_inventory_id IS NOT NULL THEN
+              UPDATE technician_borrowings 
+              SET status = 'consumed' 
+              WHERE component_type = NEW.component_type 
+                AND inventory_id = NEW.new_inventory_id 
+                AND status = 'borrowed';
+          END IF;
+      END`, msg: "Create updated trigger" }
     ];
     for (const { sql, msg } of alterations) {
       try {
