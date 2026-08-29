@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  BriefcaseBusiness, LayoutDashboard, Settings, Zap, Users, Package, Wrench, HeartPulse, Truck, KeyRound,
+  BriefcaseBusiness, LayoutDashboard, Settings, Zap, Users, Package, Wrench, HeartPulse, Truck, KeyRound, UserCog, BarChart2
 } from "lucide-react";
 import {
   Sidebar as ShadcnSidebar,
@@ -27,6 +27,8 @@ const menuItems = [
   { icon: Truck,       label: "Delivery",      href: "/app/delivery" },
   { icon: KeyRound,    label: "Software Keys", href: "/app/software-keys" },
   { icon: HeartPulse,  label: "After Service",  href: "/app/afterservice" },
+  { icon: UserCog,     label: "Users",         href: "/app/users" },
+  { icon: BarChart2,   label: "Reports",       href: "/app/reports" },
   // TODO: add as sections are implemented
   // { icon: Briefcase,       label: 'Jobs',       href: '/app/jobs' },
   // { icon: Wrench,          label: 'Assembly',   href: '/app/assembly' },

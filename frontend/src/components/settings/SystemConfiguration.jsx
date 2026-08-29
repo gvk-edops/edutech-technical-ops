@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -167,15 +167,12 @@ const getCatalogCardStyle = (columns, item) => {
   };
 };
 
-// ── Generic catalog table component ─────────────────
 function CatalogTable({
-  title,
   items,
   columns,
   onAdd,
   onEdit,
   onDelete,
-  loading,
   cardLayout = false,
 }) {
   const [intelLogos, setIntelLogos] = useState(null);
@@ -467,16 +464,18 @@ function useCatalog(endpoint) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const fetch = async () => {
+  const fetch = useCallback(async () => {
     try {
       const { data } = await axios.get(`${API_URL}${endpoint}`);
       setItems(data.data || []);
-    } catch {}
-  };
+    } catch (err) {
+      console.error("Failed to fetch catalogs:", err);
+    }
+  }, [endpoint]);
 
   useEffect(() => {
     fetch();
-  }, [endpoint]);
+  }, [fetch]);
 
   const save = async (item) => {
     setLoading(true);
