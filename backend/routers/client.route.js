@@ -1,9 +1,5 @@
 import express from "express";
-import {
-  verifyAdmin,
-  verifyManager,
-  verifyTechnician,
-} from "../middleware/auth.js";
+import { verifyAdmin, verifyManager } from "../middleware/auth.js";
 import {
   getClients,
   getLocations,
@@ -14,8 +10,8 @@ import {
 
 const router = express.Router();
 
-router.get("/locations", ...verifyTechnician, getLocations);
-router.get("/", ...verifyTechnician, getClients);
+router.get("/locations", ...verifyManager, getLocations);
+router.get("/", ...verifyManager, getClients);
 router.post("/", ...verifyManager, createClient);
 router.put("/:id", ...verifyManager, updateClient);
 router.delete("/:id", ...verifyAdmin, deleteClient);

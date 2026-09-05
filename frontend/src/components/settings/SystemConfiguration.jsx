@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -527,9 +528,9 @@ function ItemDialog({
 
   useEffect(() => {
     if (!isOpsForm) return;
-    fetch("/ops-cpu-specs.json")
-      .then((response) => response.json())
-      .then((data) => setCpuSpecs(data.processors || []))
+    axios
+      .get(`${API_URL}/catalogs/ops-cpu-specs`, { withCredentials: true })
+      .then(({ data }) => setCpuSpecs(data.data?.processors || []))
       .catch(() => {});
   }, [isOpsForm]);
   useEffect(() => {
@@ -577,119 +578,145 @@ function ItemDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className={(isRamForm || isStorageForm) ? "max-w-2xl" : ""}>
+      <AlertDialogContent
+        className={`max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:max-h-[calc(100dvh-2rem)] sm:p-6 ${isRamForm || isStorageForm ? "max-w-2xl" : ""}`}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>
             Enter the catalog item details.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className={(isRamForm || isStorageForm) ? "flex gap-4" : ""}>
-        {isRamForm && (
-          <div className="flex-1 min-w-0">
-            <RamSpecCard
-              preview
-              ddrVersion={form.ddr_version}
-              capacity={form.capacity_gb != null && form.capacity_gb !== "" ? `${form.capacity_gb} GB` : undefined}
-              busSpeed={form.bus_speed_mhz ? `${form.bus_speed_mhz} MHz` : undefined}
-              description={form.description}
-            />
-          </div>
-        )}
-        {isStorageForm && (
-          <div className="flex-1 min-w-0">
-            <StorageSpecCard
-              preview
-              type={getStorageType(form.storage_type, form.form_factor, form.interface)}
-              capacity={form.capacity_gb != null && form.capacity_gb !== "" ? (Number(form.capacity_gb) >= 1024 ? `${Number(form.capacity_gb) / 1024} TB` : `${form.capacity_gb} GB`) : undefined}
-              description={form.description}
-            />
-          </div>
-        )}
-        <div className={`space-y-3 py-2${(isRamForm || isStorageForm) ? " flex-1" : ""}`}>
-          {fields.map((f) => (
-            <div key={f.key} className="space-y-1">
-              <Label>
-                {f.label}
-                {f.required ? " *" : ""}
-              </Label>
-              {f.type === "select" ? (
-                <Select
-                  value={form[f.key] || ""}
-                  onValueChange={(v) => {
-                    if (f.key === "model_name" && isOpsForm) {
-                      setModelName(v);
-                    } else if (f.key === "storage_type" && v === "HDD") {
-                      setForm((current) => ({
-                        ...current,
-                        form_factor: "2.5",
-                        interface: "SATA",
-                        capacity_gb: storageOptions.capacity.HDD.some(
-                          (option) => option.value === current.capacity_gb,
-                        )
-                          ? current.capacity_gb
-                          : storageOptions.capacity.HDD[0].value,
-                      }));
-                    } else if (f.key === "storage_type" && v === "SSD") {
-                      setForm((current) => ({
-                        ...current,
-                        storage_type: v,
-                        capacity_gb: storageOptions.capacity.SSD.some(
-                          (option) => option.value === current.capacity_gb,
-                        )
-                          ? current.capacity_gb
-                          : storageOptions.capacity.SSD[0].value,
-                      }));
-                    } else if (
-                      f.key === "form_factor" &&
-                      form.storage_type === "SSD" &&
-                      (v === "2.5" || v === "mSATA")
-                    ) {
-                      setForm((current) => ({
-                        ...current,
-                        form_factor: v,
-                        interface: "SATA",
-                      }));
-                    } else {
-                      set(f.key, v);
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={`Select ${f.label}`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(typeof f.options === "function"
-                      ? f.options(form, cpuSpecs)
-                      : f.options
-                    ).map((o) => {
-                      const option =
-                        typeof o === "string" ? { value: o, label: o } : o;
-                      return (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  type={f.type || "text"}
-                  value={form[f.key] || ""}
-                  placeholder={f.placeholder}
-                  onChange={(e) =>
-                    f.key === "model_name" && isOpsForm
-                      ? setModelName(e.target.value)
-                      : set(f.key, e.target.value)
-                  }
-                />
-              )}
+        <div
+          className={
+            isRamForm || isStorageForm
+              ? "flex min-w-0 flex-col gap-4 sm:flex-row"
+              : "min-w-0"
+          }
+        >
+          {isRamForm && (
+            <div className="flex-1 min-w-0">
+              <RamSpecCard
+                preview
+                ddrVersion={form.ddr_version}
+                capacity={
+                  form.capacity_gb != null && form.capacity_gb !== ""
+                    ? `${form.capacity_gb} GB`
+                    : undefined
+                }
+                busSpeed={
+                  form.bus_speed_mhz ? `${form.bus_speed_mhz} MHz` : undefined
+                }
+                description={form.description}
+              />
             </div>
-          ))}
+          )}
+          {isStorageForm && (
+            <div className="flex-1 min-w-0">
+              <StorageSpecCard
+                preview
+                type={getStorageType(
+                  form.storage_type,
+                  form.form_factor,
+                  form.interface,
+                )}
+                capacity={
+                  form.capacity_gb != null && form.capacity_gb !== ""
+                    ? Number(form.capacity_gb) >= 1024
+                      ? `${Number(form.capacity_gb) / 1024} TB`
+                      : `${form.capacity_gb} GB`
+                    : undefined
+                }
+                description={form.description}
+              />
+            </div>
+          )}
+          <div
+            className={`min-w-0 space-y-3 py-2${isRamForm || isStorageForm ? " flex-1" : ""}`}
+          >
+            {fields.map((f) => (
+              <div key={f.key} className="space-y-1">
+                <Label>
+                  {f.label}
+                  {f.required ? " *" : ""}
+                </Label>
+                {f.type === "select" ? (
+                  <Select
+                    value={form[f.key] || ""}
+                    onValueChange={(v) => {
+                      if (f.key === "model_name" && isOpsForm) {
+                        setModelName(v);
+                      } else if (f.key === "storage_type" && v === "HDD") {
+                        setForm((current) => ({
+                          ...current,
+                          form_factor: "2.5",
+                          interface: "SATA",
+                          capacity_gb: storageOptions.capacity.HDD.some(
+                            (option) => option.value === current.capacity_gb,
+                          )
+                            ? current.capacity_gb
+                            : storageOptions.capacity.HDD[0].value,
+                        }));
+                      } else if (f.key === "storage_type" && v === "SSD") {
+                        setForm((current) => ({
+                          ...current,
+                          storage_type: v,
+                          capacity_gb: storageOptions.capacity.SSD.some(
+                            (option) => option.value === current.capacity_gb,
+                          )
+                            ? current.capacity_gb
+                            : storageOptions.capacity.SSD[0].value,
+                        }));
+                      } else if (
+                        f.key === "form_factor" &&
+                        form.storage_type === "SSD" &&
+                        (v === "2.5" || v === "mSATA")
+                      ) {
+                        setForm((current) => ({
+                          ...current,
+                          form_factor: v,
+                          interface: "SATA",
+                        }));
+                      } else {
+                        set(f.key, v);
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={`Select ${f.label}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(typeof f.options === "function"
+                        ? f.options(form, cpuSpecs)
+                        : f.options
+                      ).map((o) => {
+                        const option =
+                          typeof o === "string" ? { value: o, label: o } : o;
+                        return (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    type={f.type || "text"}
+                    value={form[f.key] || ""}
+                    placeholder={f.placeholder}
+                    onChange={(e) =>
+                      f.key === "model_name" && isOpsForm
+                        ? setModelName(e.target.value)
+                        : set(f.key, e.target.value)
+                    }
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-        </div>
-        <AlertDialogFooter>
+        <AlertDialogFooter className="sticky bottom-0 -mx-4 -mb-4 border-t bg-background/95 p-4 backdrop-blur sm:-mx-6 sm:-mb-6 sm:p-6">
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             disabled={loading}
@@ -783,10 +810,92 @@ function CatalogSection({
   );
 }
 
+function OpsSpecsJsonEditor() {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const openEditor = async () => {
+    setLoading(true);
+    try {
+      const { data } = await axios.get(`${API_URL}/catalogs/ops-cpu-specs`);
+      setValue(JSON.stringify(data.data, null, 2));
+      setOpen(true);
+    } catch (err) {
+      toast.error(err.response?.data?.Error || "Could not load OPS specs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const save = async () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      toast.error("Enter valid JSON before saving");
+      return;
+    }
+    setLoading(true);
+    try {
+      await axios.put(`${API_URL}/catalogs/ops-cpu-specs`, parsed);
+      toast.success("OPS processor JSON updated");
+      setOpen(false);
+    } catch (err) {
+      toast.error(err.response?.data?.Error || "Could not save OPS specs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={openEditor}
+        disabled={loading}
+      >
+        <Pencil className="mr-2 h-4 w-4" /> Edit processor JSON
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent className="max-h-[calc(100dvh-1rem)] max-w-[calc(100%-1rem)] overflow-y-auto p-4 sm:max-h-[calc(100dvh-2rem)] sm:max-w-3xl sm:p-6">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Edit OPS processor JSON</AlertDialogTitle>
+            <AlertDialogDescription>
+              Update the processor suggestions used to auto-fill OPS model
+              fields. The root object must contain a processors array, and each
+              item must have a model.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            className="min-h-[420px] resize-y font-mono text-xs"
+            spellCheck={false}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <Button onClick={save} disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save JSON
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 // ── RAM Catalog Section ─────────────────────────────────
 const ramFields = [
   { key: "ddr_version", label: "DDR Version (e.g. DDR4)", required: true },
-  { key: "capacity_gb", label: "Capacity (GB)", type: "number", required: true },
+  {
+    key: "capacity_gb",
+    label: "Capacity (GB)",
+    type: "number",
+    required: true,
+  },
   { key: "bus_speed_mhz", label: "Bus Speed (MHz, e.g. 3200)", type: "number" },
   { key: "description", label: "Description" },
 ];
@@ -808,15 +917,21 @@ function RamCatalogSection() {
       </div>
 
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-8">No items yet</p>
+        <p className="text-sm text-muted-foreground text-center py-8">
+          No items yet
+        </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-3">
           {items.map((item) => (
             <RamSpecCard
               key={item.id}
               ddrVersion={item.ddr_version}
-              capacity={item.capacity_gb != null ? `${item.capacity_gb} GB` : undefined}
-              busSpeed={item.bus_speed_mhz ? `${item.bus_speed_mhz} MHz` : undefined}
+              capacity={
+                item.capacity_gb != null ? `${item.capacity_gb} GB` : undefined
+              }
+              busSpeed={
+                item.bus_speed_mhz ? `${item.bus_speed_mhz} MHz` : undefined
+              }
               description={item.description}
               onEdit={() => setDialog({ item })}
               onDelete={() => setDeleteTarget(item)}
@@ -842,13 +957,18 @@ function RamCatalogSection() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete item?</AlertDialogTitle>
-            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This cannot be undone.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => { remove(deleteTarget.id); setDeleteTarget(null); }}
+              onClick={() => {
+                remove(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
             >
               Delete
             </AlertDialogAction>
@@ -896,7 +1016,9 @@ const storageFields = [
 ];
 
 function StorageCatalogSection() {
-  const { items, loading, save, remove } = useCatalog("/catalogs/storage-specs");
+  const { items, loading, save, remove } = useCatalog(
+    "/catalogs/storage-specs",
+  );
   const [dialog, setDialog] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
@@ -912,14 +1034,26 @@ function StorageCatalogSection() {
       </div>
 
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-8">No items yet</p>
+        <p className="text-sm text-muted-foreground text-center py-8">
+          No items yet
+        </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-3">
           {items.map((item) => (
             <StorageSpecCard
               key={item.id}
-              type={getStorageType(item.storage_type, item.form_factor, item.interface)}
-              capacity={item.capacity_gb != null ? (Number(item.capacity_gb) >= 1024 ? `${Number(item.capacity_gb) / 1024} TB` : `${item.capacity_gb} GB`) : undefined}
+              type={getStorageType(
+                item.storage_type,
+                item.form_factor,
+                item.interface,
+              )}
+              capacity={
+                item.capacity_gb != null
+                  ? Number(item.capacity_gb) >= 1024
+                    ? `${Number(item.capacity_gb) / 1024} TB`
+                    : `${item.capacity_gb} GB`
+                  : undefined
+              }
               description={item.description}
               onEdit={() => setDialog({ item })}
               onDelete={() => setDeleteTarget(item)}
@@ -945,13 +1079,18 @@ function StorageCatalogSection() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete item?</AlertDialogTitle>
-            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This cannot be undone.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => { remove(deleteTarget.id); setDeleteTarget(null); }}
+              onClick={() => {
+                remove(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
             >
               Delete
             </AlertDialogAction>
@@ -1010,58 +1149,69 @@ export default function SystemConfiguration() {
 
         {/* OPS Models */}
         <TabsContent value="ops">
-          <CatalogSection
-            endpoint="/catalogs/ops-models"
-            title="OPS Models"
-            description="OPS unit processor specifications"
-            cardLayout
-            columns={[
-              { key: "model_name", label: "Model" },
-              { key: "processor_series", label: "Series" },
-              { key: "processor_core", label: "Core" },
-              { key: "base_speed_ghz", label: "GHz" },
-              { key: "cache_mb", label: "Cache (MB)" },
-              { key: "description", label: "Description" },
-            ]}
-            fields={[
-              {
-                key: "model_name",
-                label: "OPS Model",
-                type: "select",
-                options: (_, cpuSpecs) => cpuSpecs.map((cpu) => cpu.model),
-                required: true,
-              },
-              {
-                key: "processor_series",
-                label: "Processor Series",
-                type: "select",
-                options: [
-                  "i3",
-                  "i5",
-                  "i7",
-                  "i9",
-                  "Ultra 3",
-                  "Ultra 5",
-                  "Ultra 7",
-                  "Ultra 9",
-                ],
-                required: true,
-              },
-              {
-                key: "processor_core",
-                label: "Processor Core (e.g. i5, i7)",
-                required: true,
-              },
-              { key: "processor_count", label: "Core Count", type: "number" },
-              {
-                key: "base_speed_ghz",
-                label: "Base Speed (GHz)",
-                type: "number",
-              },
-              { key: "cache_mb", label: "Cache (MB)", type: "number" },
-              { key: "description", label: "Description" },
-            ]}
-          />
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-semibold">Processor suggestion catalog</p>
+                <p className="text-sm text-muted-foreground">
+                  Maintain the JSON list used by the OPS model form.
+                </p>
+              </div>
+              <OpsSpecsJsonEditor />
+            </div>
+            <CatalogSection
+              endpoint="/catalogs/ops-models"
+              title="OPS Models"
+              description="OPS unit processor specifications"
+              cardLayout
+              columns={[
+                { key: "model_name", label: "Model" },
+                { key: "processor_series", label: "Series" },
+                { key: "processor_core", label: "Core" },
+                { key: "base_speed_ghz", label: "GHz" },
+                { key: "cache_mb", label: "Cache (MB)" },
+                { key: "description", label: "Description" },
+              ]}
+              fields={[
+                {
+                  key: "model_name",
+                  label: "OPS Model",
+                  type: "select",
+                  options: (_, cpuSpecs) => cpuSpecs.map((cpu) => cpu.model),
+                  required: true,
+                },
+                {
+                  key: "processor_series",
+                  label: "Processor Series",
+                  type: "select",
+                  options: [
+                    "i3",
+                    "i5",
+                    "i7",
+                    "i9",
+                    "Ultra 3",
+                    "Ultra 5",
+                    "Ultra 7",
+                    "Ultra 9",
+                  ],
+                  required: true,
+                },
+                {
+                  key: "processor_core",
+                  label: "Processor Core (e.g. i5, i7)",
+                  required: true,
+                },
+                { key: "processor_count", label: "Core Count", type: "number" },
+                {
+                  key: "base_speed_ghz",
+                  label: "Base Speed (GHz)",
+                  type: "number",
+                },
+                { key: "cache_mb", label: "Cache (MB)", type: "number" },
+                { key: "description", label: "Description" },
+              ]}
+            />
+          </div>
         </TabsContent>
 
         {/* RAM Specs */}
