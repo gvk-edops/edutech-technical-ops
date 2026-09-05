@@ -8,17 +8,49 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const defaultLocations = [
+  ["Colombo", "Western"],
+  ["Gampaha", "Western"],
+  ["Kalutara", "Western"],
+  ["Kandy", "Central"],
+  ["Matale", "Central"],
+  ["Nuwara Eliya", "Central"],
+  ["Galle", "Southern"],
+  ["Matara", "Southern"],
+  ["Hambantota", "Southern"],
+  ["Jaffna", "Northern"],
+  ["Kilinochchi", "Northern"],
+  ["Mannar", "Northern"],
+  ["Mullaitivu", "Northern"],
+  ["Vavuniya", "Northern"],
+  ["Batticaloa", "Eastern"],
+  ["Ampara", "Eastern"],
+  ["Trincomalee", "Eastern"],
+  ["Kurunegala", "North Western"],
+  ["Puttalam", "North Western"],
+  ["Anuradhapura", "North Central"],
+  ["Polonnaruwa", "North Central"],
+  ["Badulla", "Uva"],
+  ["Monaragala", "Uva"],
+  ["Ratnapura", "Sabaragamuwa"],
+  ["Kegalle", "Sabaragamuwa"],
+].map(([name, province], index) => ({ id: index + 1, name, province }));
+
 async function seedLocations(conn) {
   const locationsPath = path.join(
     __dirname,
     "../../frontend/public/districts.json",
   );
-  if (!fs.existsSync(locationsPath)) return;
-
-  const locations = JSON.parse(fs.readFileSync(locationsPath, "utf8"));
+  const locations = fs.existsSync(locationsPath)
+    ? JSON.parse(fs.readFileSync(locationsPath, "utf8"))
+    : defaultLocations;
   const provinces = [
     ...new Set(locations.map((location) => location.province)),
   ];
+
+  console.log(
+    `📍 Seeding ${provinces.length} provinces and ${locations.length} districts`,
+  );
 
   for (const [index, province] of provinces.entries()) {
     await conn.query("INSERT IGNORE INTO provinces (id, name) VALUES (?, ?)", [
