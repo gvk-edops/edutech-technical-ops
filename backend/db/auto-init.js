@@ -204,6 +204,12 @@ async function autoInitialize() {
   // Execute one complete statement at a time. mysql2 does not process the
   // mysql client DELIMITER command itself.
   for (const statement of splitSqlStatements(raw)) {
+    // The connection is already using DB_NAME. Do not let the SQL dump switch
+    // to its local development database name.
+    const sqlWithoutComments = statement
+      .replace(/^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*/g, "")
+      .trim();
+    if (/^(CREATE\s+DATABASE|USE)\b/i.test(sqlWithoutComments)) continue;
     await conn.query(statement);
   }
 
