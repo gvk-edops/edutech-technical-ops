@@ -1,5 +1,5 @@
 import express from "express";
-import { verifyAdmin, verifyManager } from "../middleware/auth.js";
+import { verifyAdmin, verifyTechnician } from "../middleware/auth.js";
 import {
   getSystemSettings,
   updateSystemSettings,
@@ -7,7 +7,7 @@ import {
 
 const router = express.Router();
 
-router.get("/system", ...verifyManager, getSystemSettings);
+router.get("/system", ...verifyTechnician, getSystemSettings);
 router.put("/system", ...verifyAdmin, updateSystemSettings);
 
 export default router;

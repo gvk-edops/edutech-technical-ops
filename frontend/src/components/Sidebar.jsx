@@ -104,6 +104,7 @@ export default function Sidebar() {
   const location = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
   const [systemName, setSystemName] = useState("OPS Management");
+  const [systemLogo, setSystemLogo] = useState("");
   const [role, setRole] = useState("");
 
   useEffect(() => {
@@ -112,16 +113,15 @@ export default function Sidebar() {
       .then(({ data }) => {
         const currentRole = data.Status ? data.user?.role : "";
         setRole(currentRole);
-        if (["admin", "manager"].includes(currentRole)) {
-          return axios.get(`${API_URL}/settings/system`, {
-            withCredentials: true,
-          });
-        }
-        return null;
+        return axios.get(`${API_URL}/settings/system`, {
+          withCredentials: true,
+        });
       })
       .then((response) => {
-        if (response?.data?.success)
+        if (response?.data?.success) {
           setSystemName(response.data.data.system_name || "OPS Management");
+          setSystemLogo(response.data.data.system_logo_url || "");
+        }
       })
       .catch(() => {});
   }, []);
@@ -139,7 +139,15 @@ export default function Sidebar() {
               size="lg"
               className="group-data-[collapsible=icon]:justify-center"
             >
-              <Zap className="shrink-0 w-8 h-8" />
+              {systemLogo ? (
+                <img
+                  src={systemLogo}
+                  alt={`${systemName} logo`}
+                  className="h-8 w-8 shrink-0 rounded-md object-contain"
+                />
+              ) : (
+                <Zap className="h-8 w-8 shrink-0" />
+              )}
               <span className="text-base font-bold tracking-wide group-data-[collapsible=icon]:hidden truncate">
                 {systemName}
               </span>
