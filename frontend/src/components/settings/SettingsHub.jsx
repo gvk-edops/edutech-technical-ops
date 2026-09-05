@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "@/utils/axios";
+import { API_URL } from "@/lib/api";
 import {
   Card,
   CardDescription,
@@ -16,6 +19,7 @@ const categories = [
     color: "text-blue-600",
     bg: "bg-blue-50",
     path: "/app/settings/account",
+    roles: ["admin"],
   },
   {
     id: "preferences",
@@ -25,6 +29,7 @@ const categories = [
     color: "text-green-600",
     bg: "bg-green-50",
     path: "/app/settings/preferences",
+    roles: ["admin", "manager"],
   },
   {
     id: "system",
@@ -35,18 +40,32 @@ const categories = [
     color: "text-purple-600",
     bg: "bg-purple-50",
     path: "/app/settings/system-configuration",
+    roles: ["admin", "manager"],
   },
 ];
 
 export default function SettingsHub() {
   const navigate = useNavigate();
+  const [role, setRole] = useState(null);
+
+  useEffect(() => {
+    axios
+      .get(`${API_URL}/auth/me`)
+      .then(({ data }) => setRole(data.Status ? data.user?.role : null))
+      .catch(() => setRole(null));
+  }, []);
+
+  const visibleCategories = categories.filter((category) =>
+    category.roles.includes(role),
+  );
+
   return (
     <main className="overflow-y-auto p-5">
       <p className="text-sm text-muted-foreground mb-6">
         Manage your account, preferences, and system catalogs
       </p>
       <div className="flex flex-wrap gap-4">
-        {categories.map(
+        {visibleCategories.map(
           ({ id, title, description, icon: Icon, color, bg, path }) => (
             <Card
               key={id}

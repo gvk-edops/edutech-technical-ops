@@ -1,23 +1,31 @@
 import express from "express";
-import { verifyTechnician, verifyManager } from "../middleware/auth.js";
+import { verifyManager } from "../middleware/auth.js";
 import {
-  getAfterServiceJobs, getJobUnits,
-  getRepairs, searchUnits, getTechnicians, getRepairDetail,
-  createRepair, updateStatus, assignTechnician, logReplacement, updateNotes,
+  getAfterServiceJobs,
+  getJobUnits,
+  getRepairs,
+  searchUnits,
+  getTechnicians,
+  getRepairDetail,
+  createRepair,
+  updateStatus,
+  assignTechnician,
+  logReplacement,
+  updateNotes,
 } from "../controllers/afterservice.controller.js";
 
 const router = express.Router();
 
-router.get("/jobs",                ...verifyTechnician, getAfterServiceJobs);
-router.get("/jobs/:jobId/units",   ...verifyTechnician, getJobUnits);
-router.get("/",                    ...verifyTechnician, getRepairs);
-router.get("/units",               ...verifyTechnician, searchUnits);
-router.get("/technicians",         ...verifyTechnician, getTechnicians);
-router.get("/:id",                 ...verifyTechnician, getRepairDetail);
-router.post("/",                   ...verifyManager,    createRepair);
-router.patch("/:id/status",        ...verifyTechnician, updateStatus);
-router.patch("/:id/assign",        ...verifyManager,    assignTechnician);
-router.post("/:id/replacement",    ...verifyTechnician, logReplacement);
-router.patch("/:id/notes",         ...verifyTechnician, updateNotes);
+router.get("/jobs", ...verifyManager, getAfterServiceJobs);
+router.get("/jobs/:jobId/units", ...verifyManager, getJobUnits);
+router.get("/", ...verifyManager, getRepairs);
+router.get("/units", ...verifyManager, searchUnits);
+router.get("/technicians", ...verifyManager, getTechnicians);
+router.get("/:id", ...verifyManager, getRepairDetail);
+router.post("/", ...verifyManager, createRepair);
+router.patch("/:id/status", ...verifyManager, updateStatus);
+router.patch("/:id/assign", ...verifyManager, assignTechnician);
+router.post("/:id/replacement", ...verifyManager, logReplacement);
+router.patch("/:id/notes", ...verifyManager, updateNotes);
 
 export default router;

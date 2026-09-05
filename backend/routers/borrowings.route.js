@@ -7,11 +7,11 @@ import {
   scanInventory,
   lendBatch,
 } from "../controllers/borrowings.controller.js";
-import { verifyToken } from "../middleware/auth.js";
+import { verifyManager } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.use(verifyToken);
+router.use(...verifyManager);
 
 router.get("/", getBorrowings);
 router.get("/scan", scanInventory);

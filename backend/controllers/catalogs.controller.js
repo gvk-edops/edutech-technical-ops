@@ -1,5 +1,56 @@
 import pool from "../config/db.config.js";
 import { logAction } from "../utils/audit.js";
+import fs from "fs/promises";
+import path from "path";
+
+const opsSpecsPaths = [
+  path.join(process.cwd(), "public", "ops-cpu-specs.json"),
+  path.join(process.cwd(), "frontend", "public", "ops-cpu-specs.json"),
+];
+
+const findOpsSpecsPath = async () => {
+  for (const filePath of opsSpecsPaths) {
+    try {
+      await fs.access(filePath);
+      return filePath;
+    } catch {}
+  }
+  return opsSpecsPaths[0];
+};
+
+export const getOpsCpuSpecs = async (req, res) => {
+  try {
+    const filePath = await findOpsSpecsPath();
+    const content = await fs.readFile(filePath, "utf8");
+    res.json({ Status: true, data: JSON.parse(content) });
+  } catch (err) {
+    res.status(500).json({ Status: false, Error: `Could not read OPS specs: ${err.message}` });
+  }
+};
+
+export const updateOpsCpuSpecs = async (req, res) => {
+  const data = req.body;
+  if (!data || !Array.isArray(data.processors)) {
+    return res.status(400).json({ Status: false, Error: "JSON must contain a processors array" });
+  }
+
+  const invalid = data.processors.some(
+    (item) => !item || typeof item !== "object" || !item.model,
+  );
+  if (invalid) {
+    return res.status(400).json({ Status: false, Error: "Every processor must contain a model" });
+  }
+
+  try {
+    const filePath = await findOpsSpecsPath();
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+    void logAction({ userId: req.user.id, action: "catalog.ops_specs_updated", entityType: "ops_cpu_specs", req });
+    res.json({ Status: true, data });
+  } catch (err) {
+    res.status(500).json({ Status: false, Error: `Could not save OPS specs: ${err.message}` });
+  }
+};
 
 // Map of route key → { table, fields }
 const CATALOGS = {

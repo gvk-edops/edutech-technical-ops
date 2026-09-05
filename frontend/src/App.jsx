@@ -16,6 +16,10 @@ import AuditPortal from "./components/AuditPortal";
 import Users from "./components/Users";
 import Reports from "./components/Reports";
 import Lending from "./components/Lending";
+import RoleRoute from "./components/RoleRoute";
+
+const operationsRoles = ["admin", "manager"];
+const assemblyRoles = ["admin", "manager", "technician"];
 
 function App() {
   return (
@@ -27,18 +31,95 @@ function App() {
 
         <Route path="/app" element={<DashboardLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
+          <Route
+            path="dashboard"
+            element={
+              <RoleRoute allowedRoles={operationsRoles}>
+                <Dashboard />
+              </RoleRoute>
+            }
+          />
           <Route path="settings/*" element={<SettingsRouter />} />
-          <Route path="clients" element={<Clients />} />
-          <Route path="jobs" element={<Jobs />} />
-          <Route path="inventory" element={<Inventory />} />
-          <Route path="assembly" element={<Assembly />} />
-          <Route path="delivery" element={<Delivery />} />
-          <Route path="software-keys" element={<SoftwareKeys />} />
-          <Route path="afterservice" element={<AfterService />} />
-          <Route path="users" element={<Users />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="lending" element={<Lending />} />
+          <Route
+            path="clients"
+            element={
+              <RoleRoute allowedRoles={operationsRoles}>
+                <Clients />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="jobs"
+            element={
+              <RoleRoute allowedRoles={operationsRoles}>
+                <Jobs />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="inventory"
+            element={
+              <RoleRoute allowedRoles={operationsRoles}>
+                <Inventory />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="assembly"
+            element={
+              <RoleRoute allowedRoles={assemblyRoles}>
+                <Assembly />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="delivery"
+            element={
+              <RoleRoute allowedRoles={operationsRoles}>
+                <Delivery />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="software-keys"
+            element={
+              <RoleRoute allowedRoles={operationsRoles}>
+                <SoftwareKeys />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="afterservice"
+            element={
+              <RoleRoute allowedRoles={operationsRoles}>
+                <AfterService />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="users"
+            element={
+              <RoleRoute allowedRoles={["admin"]}>
+                <Users />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="reports"
+            element={
+              <RoleRoute allowedRoles={operationsRoles}>
+                <Reports />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="lending"
+            element={
+              <RoleRoute allowedRoles={operationsRoles}>
+                <Lending />
+              </RoleRoute>
+            }
+          />
 
           {/* TODO: add as implemented */}
           {/* <Route path="users"          element={<Users />} /> */}

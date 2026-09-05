@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -783,6 +784,76 @@ function CatalogSection({
   );
 }
 
+function OpsSpecsJsonEditor() {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const openEditor = async () => {
+    setLoading(true);
+    try {
+      const { data } = await axios.get(`${API_URL}/catalogs/ops-cpu-specs`);
+      setValue(JSON.stringify(data.data, null, 2));
+      setOpen(true);
+    } catch (err) {
+      toast.error(err.response?.data?.Error || "Could not load OPS specs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const save = async () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      toast.error("Enter valid JSON before saving");
+      return;
+    }
+    setLoading(true);
+    try {
+      await axios.put(`${API_URL}/catalogs/ops-cpu-specs`, parsed);
+      toast.success("OPS processor JSON updated");
+      setOpen(false);
+    } catch (err) {
+      toast.error(err.response?.data?.Error || "Could not save OPS specs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <Button variant="outline" size="sm" onClick={openEditor} disabled={loading}>
+        <Pencil className="mr-2 h-4 w-4" /> Edit processor JSON
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent className="max-w-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Edit OPS processor JSON</AlertDialogTitle>
+            <AlertDialogDescription>
+              Update the processor suggestions used to auto-fill OPS model fields. The root object must contain a processors array, and each item must have a model.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            className="min-h-[420px] resize-y font-mono text-xs"
+            spellCheck={false}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <Button onClick={save} disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save JSON
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 // ── RAM Catalog Section ─────────────────────────────────
 const ramFields = [
   { key: "ddr_version", label: "DDR Version (e.g. DDR4)", required: true },
@@ -1010,12 +1081,20 @@ export default function SystemConfiguration() {
 
         {/* OPS Models */}
         <TabsContent value="ops">
-          <CatalogSection
-            endpoint="/catalogs/ops-models"
-            title="OPS Models"
-            description="OPS unit processor specifications"
-            cardLayout
-            columns={[
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-semibold">Processor suggestion catalog</p>
+                <p className="text-sm text-muted-foreground">Maintain the JSON list used by the OPS model form.</p>
+              </div>
+              <OpsSpecsJsonEditor />
+            </div>
+            <CatalogSection
+              endpoint="/catalogs/ops-models"
+              title="OPS Models"
+              description="OPS unit processor specifications"
+              cardLayout
+              columns={[
               { key: "model_name", label: "Model" },
               { key: "processor_series", label: "Series" },
               { key: "processor_core", label: "Core" },
@@ -1023,7 +1102,7 @@ export default function SystemConfiguration() {
               { key: "cache_mb", label: "Cache (MB)" },
               { key: "description", label: "Description" },
             ]}
-            fields={[
+              fields={[
               {
                 key: "model_name",
                 label: "OPS Model",
@@ -1060,8 +1139,9 @@ export default function SystemConfiguration() {
               },
               { key: "cache_mb", label: "Cache (MB)", type: "number" },
               { key: "description", label: "Description" },
-            ]}
-          />
+              ]}
+            />
+          </div>
         </TabsContent>
 
         {/* RAM Specs */}

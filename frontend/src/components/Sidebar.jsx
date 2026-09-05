@@ -1,6 +1,18 @@
 import { useState, useEffect } from "react";
 import {
-  BriefcaseBusiness, LayoutDashboard, Settings, Zap, Users, Package, Wrench, HeartPulse, Truck, KeyRound, UserCog, BarChart2, Handshake
+  BriefcaseBusiness,
+  LayoutDashboard,
+  Settings,
+  Zap,
+  Users,
+  Package,
+  Wrench,
+  HeartPulse,
+  Truck,
+  KeyRound,
+  UserCog,
+  BarChart2,
+  Handshake,
 } from "lucide-react";
 import {
   Sidebar as ShadcnSidebar,
@@ -19,17 +31,67 @@ import axios from "axios";
 import { API_URL } from "@/lib/api";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/app/dashboard" },
-  { icon: Users, label: "Clients", href: "/app/clients" },
-  { icon: BriefcaseBusiness, label: "Jobs", href: "/app/jobs" },
-  { icon: Package, label: "Inventory", href: "/app/inventory" },
-  { icon: Wrench,      label: "Assembly",      href: "/app/assembly" },
-  { icon: Truck,       label: "Delivery",      href: "/app/delivery" },
-  { icon: KeyRound,    label: "Software Keys", href: "/app/software-keys" },
-  { icon: HeartPulse,  label: "After Service",  href: "/app/afterservice" },
-  { icon: Handshake,   label: "Lending",       href: "/app/lending" },
-  { icon: UserCog,     label: "Users",         href: "/app/users" },
-  { icon: BarChart2,   label: "Reports",       href: "/app/reports" },
+  {
+    icon: LayoutDashboard,
+    label: "Dashboard",
+    href: "/app/dashboard",
+    roles: ["admin", "manager"],
+  },
+  {
+    icon: Users,
+    label: "Clients",
+    href: "/app/clients",
+    roles: ["admin", "manager"],
+  },
+  {
+    icon: BriefcaseBusiness,
+    label: "Jobs",
+    href: "/app/jobs",
+    roles: ["admin", "manager"],
+  },
+  {
+    icon: Package,
+    label: "Inventory",
+    href: "/app/inventory",
+    roles: ["admin", "manager"],
+  },
+  {
+    icon: Wrench,
+    label: "Assembly",
+    href: "/app/assembly",
+    roles: ["admin", "manager", "technician"],
+  },
+  {
+    icon: Truck,
+    label: "Delivery",
+    href: "/app/delivery",
+    roles: ["admin", "manager"],
+  },
+  {
+    icon: KeyRound,
+    label: "Software Keys",
+    href: "/app/software-keys",
+    roles: ["admin", "manager"],
+  },
+  {
+    icon: HeartPulse,
+    label: "After Service",
+    href: "/app/afterservice",
+    roles: ["admin", "manager"],
+  },
+  {
+    icon: Handshake,
+    label: "Lending",
+    href: "/app/lending",
+    roles: ["admin", "manager"],
+  },
+  { icon: UserCog, label: "Users", href: "/app/users", roles: ["admin"] },
+  {
+    icon: BarChart2,
+    label: "Reports",
+    href: "/app/reports",
+    roles: ["admin", "manager"],
+  },
   // TODO: add as sections are implemented
   // { icon: Briefcase,       label: 'Jobs',       href: '/app/jobs' },
   // { icon: Wrench,          label: 'Assembly',   href: '/app/assembly' },
@@ -42,13 +104,24 @@ export default function Sidebar() {
   const location = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
   const [systemName, setSystemName] = useState("OPS Management");
+  const [role, setRole] = useState("");
 
   useEffect(() => {
     axios
-      .get(`${API_URL}/settings/system`, { withCredentials: true })
-      .then((r) => {
-        if (r.data.success)
-          setSystemName(r.data.data.system_name || "OPS Management");
+      .get(`${API_URL}/auth/me`, { withCredentials: true })
+      .then(({ data }) => {
+        const currentRole = data.Status ? data.user?.role : "";
+        setRole(currentRole);
+        if (["admin", "manager"].includes(currentRole)) {
+          return axios.get(`${API_URL}/settings/system`, {
+            withCredentials: true,
+          });
+        }
+        return null;
+      })
+      .then((response) => {
+        if (response?.data?.success)
+          setSystemName(response.data.data.system_name || "OPS Management");
       })
       .catch(() => {});
   }, []);
@@ -79,23 +152,25 @@ export default function Sidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.label}>
-                  <SidebarMenuButton
-                    asChild
-                    size="lg"
-                    isActive={location.pathname.startsWith(item.href)}
-                    className="data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground group-data-[collapsible=icon]:justify-center"
-                  >
-                    <Link to={item.href} onClick={handleClick}>
-                      <item.icon className="shrink-0 w-5 h-5" />
-                      <span className="text-sm group-data-[collapsible=icon]:hidden">
-                        {item.label}
-                      </span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {menuItems
+                .filter((item) => item.roles.includes(role))
+                .map((item) => (
+                  <SidebarMenuItem key={item.label}>
+                    <SidebarMenuButton
+                      asChild
+                      size="lg"
+                      isActive={location.pathname.startsWith(item.href)}
+                      className="data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground group-data-[collapsible=icon]:justify-center"
+                    >
+                      <Link to={item.href} onClick={handleClick}>
+                        <item.icon className="shrink-0 w-5 h-5" />
+                        <span className="text-sm group-data-[collapsible=icon]:hidden">
+                          {item.label}
+                        </span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -104,19 +179,21 @@ export default function Sidebar() {
       <SidebarFooter className="border-t">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              size="lg"
-              isActive={location.pathname.startsWith("/app/settings")}
-              className="data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground group-data-[collapsible=icon]:justify-center"
-            >
-              <Link to="/app/settings" onClick={handleClick}>
-                <Settings className="shrink-0 w-5 h-5" />
-                <span className="text-sm group-data-[collapsible=icon]:hidden">
-                  Settings
-                </span>
-              </Link>
-            </SidebarMenuButton>
+            {["admin", "manager"].includes(role) && (
+              <SidebarMenuButton
+                asChild
+                size="lg"
+                isActive={location.pathname.startsWith("/app/settings")}
+                className="data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground group-data-[collapsible=icon]:justify-center"
+              >
+                <Link to="/app/settings" onClick={handleClick}>
+                  <Settings className="shrink-0 w-5 h-5" />
+                  <span className="text-sm group-data-[collapsible=icon]:hidden">
+                    Settings
+                  </span>
+                </Link>
+              </SidebarMenuButton>
+            )}
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
