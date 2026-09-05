@@ -10,25 +10,25 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /* =========================================================
-   BASIC DATABASE HELPERS
+   DATABASE HELPERS
 ========================================================= */
 
 async function tableExists(conn, tableName) {
-  const [[row]] = await conn.query(
+  const [rows] = await conn.query(
     `
       SELECT COUNT(*) AS cnt
       FROM information_schema.TABLES
       WHERE TABLE_SCHEMA = DATABASE()
         AND TABLE_NAME = ?
     `,
-    [tableName],
+    [tableName]
   );
 
-  return Number(row.cnt) > 0;
+  return Number(rows[0].cnt) > 0;
 }
 
 async function columnExists(conn, tableName, columnName) {
-  const [[row]] = await conn.query(
+  const [rows] = await conn.query(
     `
       SELECT COUNT(*) AS cnt
       FROM information_schema.COLUMNS
@@ -36,76 +36,64 @@ async function columnExists(conn, tableName, columnName) {
         AND TABLE_NAME = ?
         AND COLUMN_NAME = ?
     `,
-    [tableName, columnName],
+    [tableName, columnName]
   );
 
-  return Number(row.cnt) > 0;
+  return Number(rows[0].cnt) > 0;
 }
 
 /* =========================================================
    SQL DUMP PARSER
-
-   Splits SQL statements safely while respecting:
-   - single quotes
-   - double quotes
-   - backticks
-   - escaped characters
-   - comments
-   - semicolons inside strings
 ========================================================= */
 
 function parseSqlStatements(sql) {
   const statements = [];
 
   let current = "";
-
   let state = "normal";
 
   for (let i = 0; i < sql.length; i++) {
     const char = sql[i];
     const next = sql[i + 1];
 
-    /* -----------------------------------------
-       NORMAL STATE
-    ----------------------------------------- */
+    /* NORMAL */
 
     if (state === "normal") {
-      // Single quoted string
       if (char === "'") {
         current += char;
         state = "single";
         continue;
       }
 
-      // Double quoted string
       if (char === '"') {
         current += char;
         state = "double";
         continue;
       }
 
-      // Backtick identifier
       if (char === "`") {
         current += char;
         state = "backtick";
         continue;
       }
 
-      // -- comment
+      // MySQL -- comment
       if (
         char === "-" &&
         next === "-" &&
-        (sql[i + 2] === " " ||
+        (
+          sql[i + 2] === " " ||
           sql[i + 2] === "\t" ||
           sql[i + 2] === "\r" ||
-          sql[i + 2] === "\n")
+          sql[i + 2] === "\n"
+        )
       ) {
         state = "line_comment";
         i++;
         continue;
       }
 
-      // # comment
+      // MySQL # comment
       if (char === "#") {
         state = "line_comment";
         continue;
@@ -118,11 +106,11 @@ function parseSqlStatements(sql) {
         continue;
       }
 
-      // Statement separator
+      // End of SQL statement
       if (char === ";") {
         const statement = current.trim();
 
-        if (statement.length > 0) {
+        if (statement) {
           statements.push(statement);
         }
 
@@ -134,22 +122,19 @@ function parseSqlStatements(sql) {
       continue;
     }
 
-    /* -----------------------------------------
-       SINGLE QUOTED STRING
-    ----------------------------------------- */
+    /* SINGLE QUOTE */
 
     if (state === "single") {
       current += char;
 
-      // MySQL backslash escaping
       if (char === "\\") {
         if (i + 1 < sql.length) {
           current += sql[++i];
         }
+
         continue;
       }
 
-      // SQL doubled single quote
       if (char === "'" && next === "'") {
         current += sql[++i];
         continue;
@@ -162,9 +147,7 @@ function parseSqlStatements(sql) {
       continue;
     }
 
-    /* -----------------------------------------
-       DOUBLE QUOTED STRING
-    ----------------------------------------- */
+    /* DOUBLE QUOTE */
 
     if (state === "double") {
       current += char;
@@ -173,6 +156,7 @@ function parseSqlStatements(sql) {
         if (i + 1 < sql.length) {
           current += sql[++i];
         }
+
         continue;
       }
 
@@ -188,9 +172,7 @@ function parseSqlStatements(sql) {
       continue;
     }
 
-    /* -----------------------------------------
-       BACKTICK IDENTIFIER
-    ----------------------------------------- */
+    /* BACKTICK */
 
     if (state === "backtick") {
       current += char;
@@ -207,9 +189,7 @@ function parseSqlStatements(sql) {
       continue;
     }
 
-    /* -----------------------------------------
-       LINE COMMENT
-    ----------------------------------------- */
+    /* LINE COMMENT */
 
     if (state === "line_comment") {
       if (char === "\n") {
@@ -220,9 +200,7 @@ function parseSqlStatements(sql) {
       continue;
     }
 
-    /* -----------------------------------------
-       BLOCK COMMENT
-    ----------------------------------------- */
+    /* BLOCK COMMENT */
 
     if (state === "block_comment") {
       if (char === "*" && next === "/") {
@@ -234,17 +212,17 @@ function parseSqlStatements(sql) {
     }
   }
 
-  const finalStatement = current.trim();
+  const last = current.trim();
 
-  if (finalStatement.length > 0) {
-    statements.push(finalStatement);
+  if (last) {
+    statements.push(last);
   }
 
   return statements;
 }
 
 /* =========================================================
-   DETERMINE WHETHER AN SQL STATEMENT IS SAFE TO SKIP
+   STATEMENT FILTER
 ========================================================= */
 
 function shouldSkipStatement(statement) {
@@ -253,7 +231,6 @@ function shouldSkipStatement(statement) {
     .replace(/\s+/g, " ")
     .toUpperCase();
 
-  // These are not useful during automatic schema initialization.
   if (normalized === "START TRANSACTION") {
     return true;
   }
@@ -267,25 +244,17 @@ function shouldSkipStatement(statement) {
   }
 
   /*
-    VERY IMPORTANT:
+    IMPORTANT:
 
-    The phpMyAdmin dump contains DROP TABLE IF EXISTS.
+    Do NOT execute DROP TABLE automatically.
 
-    We intentionally skip those statements so that an automatic
-    Railway restart never destroys existing application data.
+    This prevents a Railway restart from deleting
+    application data.
   */
 
   if (normalized.startsWith("DROP TABLE IF EXISTS")) {
     return true;
   }
-
-  /*
-    The SQL dump may contain delimiter commands if it was exported
-    with stored procedures/triggers.
-
-    Our application creates its trigger separately, so these are
-    unnecessary here.
-  */
 
   if (normalized.startsWith("DELIMITER ")) {
     return true;
@@ -295,17 +264,15 @@ function shouldSkipStatement(statement) {
 }
 
 /* =========================================================
-   DETERMINE WHETHER AN ERROR CAN SAFELY BE IGNORED
+   IGNORABLE MYSQL ERRORS
 ========================================================= */
 
-function isIgnorableSqlError(err, statement) {
+function isIgnorableSqlError(err) {
   const code = err?.code;
   const errno = Number(err?.errno);
   const message = String(err?.message || "").toLowerCase();
 
-  /*
-    Duplicate row during INSERT.
-  */
+  // Duplicate record
   if (
     code === "ER_DUP_ENTRY" ||
     errno === 1062 ||
@@ -314,20 +281,7 @@ function isIgnorableSqlError(err, statement) {
     return true;
   }
 
-  /*
-    Duplicate foreign-key constraint.
-  */
-  if (
-    code === "ER_FK_DUP_NAME" ||
-    errno === 1826 ||
-    message.includes("duplicate foreign key constraint name")
-  ) {
-    return true;
-  }
-
-  /*
-    Duplicate key/index name.
-  */
+  // Duplicate key
   if (
     code === "ER_DUP_KEYNAME" ||
     errno === 1061 ||
@@ -336,20 +290,25 @@ function isIgnorableSqlError(err, statement) {
     return true;
   }
 
-  /*
-    Column already exists.
-  */
+  // Duplicate column
   if (
     code === "ER_DUP_FIELDNAME" ||
     errno === 1060 ||
-    message.includes("duplicate column name")
+    message.includes("duplicate column")
   ) {
     return true;
   }
 
-  /*
-    Constraint/key does not exist while cleaning up.
-  */
+  // Duplicate foreign key name
+  if (
+    code === "ER_FK_DUP_NAME" ||
+    errno === 1826 ||
+    message.includes("duplicate foreign key constraint name")
+  ) {
+    return true;
+  }
+
+  // Cannot drop nonexistent key
   if (
     code === "ER_CANT_DROP_FIELD_OR_KEY" ||
     errno === 1091
@@ -357,12 +316,7 @@ function isIgnorableSqlError(err, statement) {
     return true;
   }
 
-  /*
-    Table already exists.
-
-    CREATE TABLE IF NOT EXISTS normally prevents this, but some
-    MySQL versions can still report it during complex dumps.
-  */
+  // Table already exists
   if (
     code === "ER_TABLE_EXISTS_ERROR" ||
     errno === 1050 ||
@@ -375,23 +329,30 @@ function isIgnorableSqlError(err, statement) {
 }
 
 /* =========================================================
-   IMPORT SQL SCHEMA
+   IMPORT DATABASE SCHEMA
 ========================================================= */
 
 async function importSchema(conn) {
   const sqlPath = path.join(
     __dirname,
-    "smartboard_ops_management.sql",
+    "smartboard_ops_management.sql"
   );
 
   if (!fs.existsSync(sqlPath)) {
-    throw new Error(`SQL schema file not found: ${sqlPath}`);
+    throw new Error(
+      `SQL schema file not found: ${sqlPath}`
+    );
   }
 
-  const rawSql = fs.readFileSync(sqlPath, "utf8");
+  const rawSql = fs.readFileSync(
+    sqlPath,
+    "utf8"
+  );
 
   if (!rawSql.trim()) {
-    throw new Error("SQL schema file is empty.");
+    throw new Error(
+      "SQL schema file is empty."
+    );
   }
 
   console.log("📄 Loading SQL schema...");
@@ -399,35 +360,39 @@ async function importSchema(conn) {
 
   /*
     Remove DELIMITER directives.
-
-    The supplied database dump does not need the trigger from the
-    dump because the application creates that trigger separately.
   */
 
   const cleanedSql = rawSql.replace(
     /^\s*DELIMITER\s+\S+\s*$/gim,
-    "",
+    ""
   );
 
-  const statements = parseSqlStatements(cleanedSql);
+  const statements =
+    parseSqlStatements(cleanedSql);
 
-  console.log(`📦 SQL statements detected: ${statements.length}`);
-  console.log("🔧 Importing database schema statement-by-statement...");
+  console.log(
+    `📦 SQL statements detected: ${statements.length}`
+  );
+
+  console.log(
+    "🔧 Importing schema statement-by-statement..."
+  );
 
   let executed = 0;
   let skipped = 0;
-  let ignoredErrors = 0;
+  let ignored = 0;
 
-  for (let i = 0; i < statements.length; i++) {
-    const statement = statements[i].trim();
+  for (
+    let i = 0;
+    i < statements.length;
+    i++
+  ) {
+    const statement =
+      statements[i].trim();
 
     if (!statement) {
       continue;
     }
-
-    /*
-      Ignore DROP TABLE, START TRANSACTION, COMMIT, etc.
-    */
 
     if (shouldSkipStatement(statement)) {
       skipped++;
@@ -436,178 +401,114 @@ async function importSchema(conn) {
 
     const preview = statement
       .replace(/\s+/g, " ")
-      .substring(0, 180);
+      .substring(0, 200);
 
     try {
       await conn.query(statement);
 
       executed++;
 
-      /*
-        Log useful progress without flooding Railway logs.
-      */
-
       if (
         executed <= 10 ||
-        executed % 20 === 0 ||
-        statement.toUpperCase().startsWith("CREATE TABLE") ||
-        statement.toUpperCase().startsWith("ALTER TABLE")
+        statement
+          .toUpperCase()
+          .startsWith("CREATE TABLE") ||
+        statement
+          .toUpperCase()
+          .startsWith("ALTER TABLE")
       ) {
         console.log(
-          `✅ SQL ${i + 1}/${statements.length}: ${preview}`,
+          `✅ SQL ${i + 1}/${statements.length}: ${preview}`
         );
       }
     } catch (err) {
-      if (isIgnorableSqlError(err, statement)) {
-        ignoredErrors++;
+      if (isIgnorableSqlError(err)) {
+        ignored++;
 
         console.warn(
-          `⚠️ Ignored harmless SQL error at statement ${i + 1}:`,
-          err.message,
+          `⚠️ Ignored harmless SQL error at statement ${i + 1}: ${err.message}`
         );
 
-        console.warn(`   Statement: ${preview}`);
+        console.warn(
+          `   SQL: ${preview}`
+        );
 
         continue;
       }
 
-      /*
-        This is a REAL error.
-
-        Show the statement number and the actual SQL preview so
-        Railway logs immediately identify the problem.
-      */
-
       console.error("");
-      console.error("========================================");
-      console.error("❌ SQL STATEMENT FAILED");
-      console.error("========================================");
-      console.error(`Statement: ${i + 1}/${statements.length}`);
-      console.error(`MySQL code: ${err.code || "unknown"}`);
-      console.error(`MySQL errno: ${err.errno || "unknown"}`);
-      console.error(`Error: ${err.message}`);
-      console.error(`SQL: ${preview}`);
-      console.error("========================================");
-      console.error("");
+      console.error(
+        "========================================"
+      );
+      console.error(
+        "❌ SQL STATEMENT FAILED"
+      );
+      console.error(
+        "========================================"
+      );
+
+      console.error(
+        `Statement: ${i + 1}/${statements.length}`
+      );
+
+      console.error(
+        `MySQL code: ${err.code || "unknown"}`
+      );
+
+      console.error(
+        `MySQL errno: ${err.errno || "unknown"}`
+      );
+
+      console.error(
+        `Error: ${err.message}`
+      );
+
+      console.error(
+        `SQL: ${preview}`
+      );
+
+      console.error(
+        "========================================"
+      );
 
       throw err;
     }
   }
 
   console.log("");
-  console.log("========================================");
-  console.log("📊 SQL IMPORT SUMMARY");
-  console.log("========================================");
-  console.log(`Total statements: ${statements.length}`);
-  console.log(`Executed: ${executed}`);
-  console.log(`Skipped: ${skipped}`);
-  console.log(`Ignored harmless errors: ${ignoredErrors}`);
-  console.log("========================================");
-  console.log("");
-
-  console.log("✅ Database schema import completed");
-}
-
-/* =========================================================
-   LOCATION SEEDING
-========================================================= */
-
-async function seedLocations(conn) {
-  if (!(await tableExists(conn, "provinces"))) {
-    console.log("ℹ️ provinces table not available. Skipping locations.");
-    return;
-  }
-
-  if (!(await tableExists(conn, "districts"))) {
-    console.log("ℹ️ districts table not available. Skipping locations.");
-    return;
-  }
-
-  const locationsPath = path.join(
-    __dirname,
-    "../../frontend/public/districts.json",
+  console.log(
+    "========================================"
+  );
+  console.log(
+    "📊 SQL IMPORT SUMMARY"
+  );
+  console.log(
+    "========================================"
   );
 
-  if (!fs.existsSync(locationsPath)) {
-    console.log("ℹ️ districts.json not found. Skipping location seed.");
-    return;
-  }
+  console.log(
+    `Total statements: ${statements.length}`
+  );
 
-  let locations;
+  console.log(
+    `Executed: ${executed}`
+  );
 
-  try {
-    locations = JSON.parse(
-      fs.readFileSync(locationsPath, "utf8"),
-    );
-  } catch (err) {
-    console.warn(
-      "⚠️ Could not read districts.json:",
-      err.message,
-    );
-    return;
-  }
+  console.log(
+    `Skipped: ${skipped}`
+  );
 
-  if (!Array.isArray(locations)) {
-    console.warn("⚠️ districts.json does not contain an array.");
-    return;
-  }
+  console.log(
+    `Ignored harmless errors: ${ignored}`
+  );
 
-  const provinces = [
-    ...new Set(
-      locations
-        .map((location) => location.province)
-        .filter(Boolean),
-    ),
-  ];
+  console.log(
+    "========================================"
+  );
 
-  for (const [index, province] of provinces.entries()) {
-    await conn.query(
-      `
-        INSERT IGNORE INTO provinces (id, name)
-        VALUES (?, ?)
-      `,
-      [index + 1, province],
-    );
-  }
-
-  for (const location of locations) {
-    if (
-      !location.province ||
-      !location.name ||
-      location.id == null
-    ) {
-      continue;
-    }
-
-    const [[province]] = await conn.query(
-      `
-        SELECT id
-        FROM provinces
-        WHERE name = ?
-        LIMIT 1
-      `,
-      [location.province],
-    );
-
-    if (!province) {
-      continue;
-    }
-
-    await conn.query(
-      `
-        INSERT IGNORE INTO districts
-        (id, name, province_id)
-        VALUES (?, ?, ?)
-      `,
-      [
-        location.id,
-        location.name,
-        province.id,
-      ],
-    );
-  }
-
-  console.log("✅ Provinces and districts seeded");
+  console.log(
+    "✅ Database schema import completed"
+  );
 }
 
 /* =========================================================
@@ -615,7 +516,12 @@ async function seedLocations(conn) {
 ========================================================= */
 
 async function updateRamSpecs(conn) {
-  if (!(await tableExists(conn, "ram_specs"))) {
+  if (
+    !(await tableExists(
+      conn,
+      "ram_specs"
+    ))
+  ) {
     return;
   }
 
@@ -623,17 +529,19 @@ async function updateRamSpecs(conn) {
     await columnExists(
       conn,
       "ram_specs",
-      "brand",
+      "brand"
     )
   ) {
     try {
       await conn.query(
-        `ALTER TABLE ram_specs DROP COLUMN brand`,
+        `ALTER TABLE ram_specs DROP COLUMN brand`
       );
 
-      console.log("✅ Removed ram_specs.brand");
+      console.log(
+        "✅ Removed ram_specs.brand"
+      );
     } catch (err) {
-      if (!isIgnorableSqlError(err, "")) {
+      if (!isIgnorableSqlError(err)) {
         throw err;
       }
     }
@@ -643,7 +551,7 @@ async function updateRamSpecs(conn) {
     !(await columnExists(
       conn,
       "ram_specs",
-      "bus_speed_mhz",
+      "bus_speed_mhz"
     ))
   ) {
     await conn.query(`
@@ -653,17 +561,22 @@ async function updateRamSpecs(conn) {
     `);
 
     console.log(
-      "✅ Added ram_specs.bus_speed_mhz",
+      "✅ Added ram_specs.bus_speed_mhz"
     );
   }
 }
 
 /* =========================================================
-   JOBS TABLE
+   JOBS
 ========================================================= */
 
 async function updateJobs(conn) {
-  if (!(await tableExists(conn, "jobs"))) {
+  if (
+    !(await tableExists(
+      conn,
+      "jobs"
+    ))
+  ) {
     return;
   }
 
@@ -671,7 +584,7 @@ async function updateJobs(conn) {
     !(await columnExists(
       conn,
       "jobs",
-      "required_date",
+      "required_date"
     ))
   ) {
     await conn.query(`
@@ -681,14 +594,14 @@ async function updateJobs(conn) {
     `);
 
     console.log(
-      "✅ Added jobs.required_date",
+      "✅ Added jobs.required_date"
     );
   }
 
   await conn.query(`
     ALTER TABLE jobs
     MODIFY COLUMN job_type
-    ENUM('smartboard', 'ops', 'both')
+    ENUM('smartboard','ops','both')
     NOT NULL DEFAULT 'both'
   `);
 
@@ -696,7 +609,7 @@ async function updateJobs(conn) {
     await columnExists(
       conn,
       "jobs",
-      "smartboard_model_id",
+      "smartboard_model_id"
     )
   ) {
     await conn.query(`
@@ -710,7 +623,7 @@ async function updateJobs(conn) {
     await columnExists(
       conn,
       "jobs",
-      "ops_model_id",
+      "ops_model_id"
     )
   ) {
     await conn.query(`
@@ -724,7 +637,7 @@ async function updateJobs(conn) {
     await columnExists(
       conn,
       "jobs",
-      "ram_ddr_version",
+      "ram_ddr_version"
     )
   ) {
     await conn.query(`
@@ -738,7 +651,7 @@ async function updateJobs(conn) {
     await columnExists(
       conn,
       "jobs",
-      "ram_capacity_gb",
+      "ram_capacity_gb"
     )
   ) {
     await conn.query(`
@@ -748,30 +661,44 @@ async function updateJobs(conn) {
     `);
   }
 
-  console.log("✅ Jobs table updated");
+  console.log(
+    "✅ Jobs table updated"
+  );
 }
 
 /* =========================================================
-   USERS TABLE
+   USERS
 ========================================================= */
 
 async function updateUsers(conn) {
-  if (!(await tableExists(conn, "users"))) {
+  if (
+    !(await tableExists(
+      conn,
+      "users"
+    ))
+  ) {
     return;
   }
 
   await conn.query(`
     ALTER TABLE users
     MODIFY COLUMN role
-    ENUM('admin','manager','technician','auditor')
+    ENUM(
+      'admin',
+      'manager',
+      'technician',
+      'auditor'
+    )
     NOT NULL DEFAULT 'technician'
   `);
 
-  console.log("✅ Users role structure updated");
+  console.log(
+    "✅ Users role structure updated"
+  );
 }
 
 /* =========================================================
-   INVENTORY STATUS ENUMS
+   INVENTORY STATUS
 ========================================================= */
 
 async function updateInventoryStatuses(conn) {
@@ -779,13 +706,18 @@ async function updateInventoryStatuses(conn) {
     "inventory_ops",
     "inventory_rams",
     "inventory_storage",
-    "inventory_network_cards",
+    "inventory_network_cards"
   ];
 
   for (const table of tables) {
-    if (!(await tableExists(conn, table))) {
+    if (
+      !(await tableExists(
+        conn,
+        table
+      ))
+    ) {
       console.log(
-        `ℹ️ ${table} does not exist. Skipping status update.`,
+        `ℹ️ ${table} does not exist. Skipping.`
       );
 
       continue;
@@ -806,7 +738,7 @@ async function updateInventoryStatuses(conn) {
     `);
 
     console.log(
-      `✅ Updated ${table}.status`,
+      `✅ Updated ${table}.status`
     );
   }
 }
@@ -819,19 +751,24 @@ async function ensureTechnicianBorrowingsTable(conn) {
   if (
     await tableExists(
       conn,
-      "technician_borrowings",
+      "technician_borrowings"
     )
   ) {
     console.log(
-      "ℹ️ technician_borrowings already exists",
+      "ℹ️ technician_borrowings already exists"
     );
 
     return;
   }
 
-  if (!(await tableExists(conn, "users"))) {
+  if (
+    !(await tableExists(
+      conn,
+      "users"
+    ))
+  ) {
     throw new Error(
-      "Cannot create technician_borrowings because users table is missing.",
+      "users table is missing. Cannot create technician_borrowings."
     );
   }
 
@@ -867,25 +804,28 @@ async function ensureTechnicianBorrowingsTable(conn) {
       notes TEXT NULL,
 
       KEY idx_borrowings_status (status),
-      KEY idx_borrowings_tech (technician_id),
+
+      KEY idx_borrowings_tech
+      (technician_id),
+
       KEY idx_borrowings_comp
-        (component_type, inventory_id),
+      (component_type, inventory_id),
 
       CONSTRAINT fk_borrowings_technician
-        FOREIGN KEY (technician_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE
+      FOREIGN KEY (technician_id)
+      REFERENCES users(id)
+      ON DELETE CASCADE
 
     ) ENGINE=InnoDB
   `);
 
   console.log(
-    "✅ Created technician_borrowings table",
+    "✅ Created technician_borrowings table"
   );
 }
 
 /* =========================================================
-   REPAIR COMPONENT REPLACEMENT TRIGGER
+   REPAIR REPLACEMENT TRIGGER
 ========================================================= */
 
 async function ensureRepairReplacementTrigger(conn) {
@@ -896,13 +836,18 @@ async function ensureRepairReplacementTrigger(conn) {
     "inventory_storage",
     "inventory_network_cards",
     "main_software_keys",
-    "technician_borrowings",
+    "technician_borrowings"
   ];
 
   for (const table of requiredTables) {
-    if (!(await tableExists(conn, table))) {
+    if (
+      !(await tableExists(
+        conn,
+        table
+      ))
+    ) {
       console.warn(
-        `⚠️ ${table} missing. Repair trigger skipped.`,
+        `⚠️ ${table} missing. Trigger skipped.`
       );
 
       return;
@@ -915,7 +860,7 @@ async function ensureRepairReplacementTrigger(conn) {
   `);
 
   console.log(
-    "✅ Removed old repair replacement trigger",
+    "✅ Removed old repair replacement trigger"
   );
 
   await conn.query(`
@@ -1011,13 +956,13 @@ async function ensureRepairReplacementTrigger(conn) {
         SET status = 'consumed'
 
         WHERE component_type =
-              NEW.component_type
+        NEW.component_type
 
-          AND inventory_id =
-              NEW.new_inventory_id
+        AND inventory_id =
+        NEW.new_inventory_id
 
-          AND status =
-              'borrowed';
+        AND status =
+        'borrowed';
 
       END IF;
 
@@ -1025,12 +970,145 @@ async function ensureRepairReplacementTrigger(conn) {
   `);
 
   console.log(
-    "✅ Created repair component replacement trigger",
+    "✅ Created repair component replacement trigger"
   );
 }
 
 /* =========================================================
-   VERIFY DATABASE SCHEMA
+   LOCATION SEED
+========================================================= */
+
+async function seedLocations(conn) {
+  if (
+    !(await tableExists(
+      conn,
+      "provinces"
+    ))
+  ) {
+    return;
+  }
+
+  if (
+    !(await tableExists(
+      conn,
+      "districts"
+    ))
+  ) {
+    return;
+  }
+
+  const locationsPath = path.join(
+    __dirname,
+    "../../frontend/public/districts.json"
+  );
+
+  if (!fs.existsSync(locationsPath)) {
+    console.log(
+      "ℹ️ districts.json not found. Skipping location seed."
+    );
+
+    return;
+  }
+
+  let locations;
+
+  try {
+    locations = JSON.parse(
+      fs.readFileSync(
+        locationsPath,
+        "utf8"
+      )
+    );
+  } catch (err) {
+    console.warn(
+      "⚠️ Could not read districts.json:",
+      err.message
+    );
+
+    return;
+  }
+
+  if (!Array.isArray(locations)) {
+    console.warn(
+      "⚠️ districts.json is not an array."
+    );
+
+    return;
+  }
+
+  const provinces = [
+    ...new Set(
+      locations
+        .map(
+          (location) =>
+            location.province
+        )
+        .filter(Boolean)
+    )
+  ];
+
+  for (
+    const [index, province] of
+    provinces.entries()
+  ) {
+    await conn.query(
+      `
+        INSERT IGNORE INTO provinces
+        (id, name)
+        VALUES (?, ?)
+      `,
+      [
+        index + 1,
+        province
+      ]
+    );
+  }
+
+  for (const location of locations) {
+    if (
+      !location.province ||
+      !location.name ||
+      location.id == null
+    ) {
+      continue;
+    }
+
+    const [rows] =
+      await conn.query(
+        `
+          SELECT id
+          FROM provinces
+          WHERE name = ?
+          LIMIT 1
+        `,
+        [location.province]
+      );
+
+    if (!rows.length) {
+      continue;
+    }
+
+    await conn.query(
+      `
+        INSERT IGNORE INTO districts
+        (id, name, province_id)
+        VALUES (?, ?, ?)
+      `,
+      [
+        location.id,
+        location.name,
+        rows[0].id
+      ]
+    );
+  }
+
+  console.log(
+    "✅ Provinces and districts seeded"
+  );
+}
+
+/* =========================================================
+   FINAL SCHEMA VERIFICATION
 ========================================================= */
 
 async function verifySchema(conn) {
@@ -1046,30 +1124,35 @@ async function verifySchema(conn) {
     "inventory_network_cards",
     "repair_jobs",
     "repair_component_replacements",
-    "technician_borrowings",
+    "technician_borrowings"
   ];
 
   const missing = [];
 
   for (const table of requiredTables) {
-    if (!(await tableExists(conn, table))) {
+    if (
+      !(await tableExists(
+        conn,
+        table
+      ))
+    ) {
       missing.push(table);
     }
   }
 
   if (missing.length > 0) {
     throw new Error(
-      `Schema verification failed. Missing tables: ${missing.join(", ")}`,
+      `Schema verification failed. Missing tables: ${missing.join(", ")}`
     );
   }
 
   console.log(
-    `✅ Schema verification passed (${requiredTables.length} required tables found)`,
+    `✅ Schema verification passed (${requiredTables.length} required tables found)`
   );
 }
 
 /* =========================================================
-   DATABASE INITIALIZATION
+   MAIN INITIALIZER
 ========================================================= */
 
 async function autoInitialize() {
@@ -1082,8 +1165,10 @@ async function autoInitialize() {
     "localhost";
 
   const dbPort =
-    parseInt(process.env.DB_PORT, 10) ||
-    3306;
+    parseInt(
+      process.env.DB_PORT,
+      10
+    ) || 3306;
 
   const dbUser =
     process.env.DB_USER ||
@@ -1095,80 +1180,84 @@ async function autoInitialize() {
   let conn;
 
   try {
-    console.log("========================================");
-    console.log("🔌 Connecting to MySQL...");
-    console.log(`🌐 Host: ${dbHost}`);
-    console.log(`🔢 Port: ${dbPort}`);
-    console.log(`👤 User: ${dbUser}`);
-    console.log(`🗄️ Database: ${dbName}`);
-    console.log("========================================");
-
-    conn = await mysql.createConnection({
-      host: dbHost,
-      port: dbPort,
-      user: dbUser,
-      password: dbPassword,
-
-      /*
-        Needed for SQL dump statements and trigger creation.
-      */
-      multipleStatements: true,
-    });
-
     console.log(
-      "✅ MySQL connection established",
+      "========================================"
     );
 
-    /* -----------------------------------------
-       CREATE DATABASE
-    ----------------------------------------- */
+    console.log(
+      "🔌 Connecting to MySQL..."
+    );
+
+    console.log(
+      `🌐 Host: ${dbHost}`
+    );
+
+    console.log(
+      `🔢 Port: ${dbPort}`
+    );
+
+    console.log(
+      `👤 User: ${dbUser}`
+    );
+
+    console.log(
+      `🗄️ Database: ${dbName}`
+    );
+
+    console.log(
+      "========================================"
+    );
+
+    conn =
+      await mysql.createConnection({
+        host: dbHost,
+        port: dbPort,
+        user: dbUser,
+        password: dbPassword,
+        multipleStatements: true
+      });
+
+    console.log(
+      "✅ MySQL connection established"
+    );
+
+    /* CREATE DATABASE */
 
     await conn.query(`
       CREATE DATABASE IF NOT EXISTS
       \`${dbName}\`
-
       CHARACTER SET utf8mb4
-
       COLLATE utf8mb4_unicode_ci
     `);
 
-    /* -----------------------------------------
-       SELECT DATABASE
-    ----------------------------------------- */
+    /* SELECT DATABASE */
 
     await conn.query(
-      `USE \`${dbName}\``,
+      `USE \`${dbName}\``
     );
 
-    const [[databaseInfo]] =
+    const [databaseRows] =
       await conn.query(
-        `SELECT DATABASE() AS db`,
+        `SELECT DATABASE() AS db`
       );
 
     console.log(
-      `🗄️ Connected database: ${databaseInfo.db}`,
+      `🗄️ Connected database: ${databaseRows[0].db}`
     );
 
-    /* -----------------------------------------
-       DISABLE FOREIGN KEY CHECKS
-
-       This prevents dependency problems when the
-       dump creates/updates tables and constraints.
-    ----------------------------------------- */
+    /* FOREIGN KEY CHECKS OFF */
 
     await conn.query(
-      `SET FOREIGN_KEY_CHECKS = 0`,
+      `SET FOREIGN_KEY_CHECKS = 0`
     );
 
     console.log(
-      "🔓 Foreign key checks temporarily disabled",
+      "🔓 Foreign key checks disabled"
     );
 
-    /* -----------------------------------------
-       CHECK EXISTING TABLES
-    ----------------------------------------- */
+    /* EXISTING TABLE COUNT */
 
-    const [[tableCount]] =
+    const [countRows] =
       await conn.query(`
         SELECT COUNT(*) AS cnt
         FROM information_schema.TABLES
@@ -1176,26 +1265,18 @@ async function autoInitialize() {
       `, [dbName]);
 
     const existingTableCount =
-      Number(tableCount.cnt);
+      Number(countRows[0].cnt);
 
     console.log(
-      `📊 Existing tables: ${existingTableCount}`,
+      `📊 Existing tables: ${existingTableCount}`
     );
 
-    /* -----------------------------------------
-       IMPORT / UPDATE SCHEMA
-
-       We always run the safe schema importer.
-
-       Because DROP TABLE statements are skipped
-       and CREATE TABLE uses IF NOT EXISTS, this
-       is safe to run on subsequent deployments.
-    ----------------------------------------- */
+    /* SCHEMA IMPORT */
 
     if (existingTableCount === 0) {
       console.log("");
       console.log(
-        "🔧 No tables found. Initialising database...",
+        "🔧 No tables found. Initialising database..."
       );
       console.log("");
 
@@ -1203,19 +1284,17 @@ async function autoInitialize() {
     } else {
       console.log("");
       console.log(
-        "🔧 Existing database detected.",
+        "🔧 Existing database detected."
       );
       console.log(
-        "🔧 Running safe schema synchronization...",
+        "🔧 Running safe schema synchronization..."
       );
       console.log("");
 
       await importSchema(conn);
     }
 
-    /* -----------------------------------------
-       REQUIRED MIGRATIONS
-    ----------------------------------------- */
+    /* MIGRATIONS */
 
     await updateRamSpecs(conn);
 
@@ -1227,71 +1306,75 @@ async function autoInitialize() {
 
     await ensureTechnicianBorrowingsTable(conn);
 
-    /* -----------------------------------------
-       LOCATION DATA
-    ----------------------------------------- */
+    /* LOCATIONS */
 
     await seedLocations(conn);
 
-    /* -----------------------------------------
-       REPAIR TRIGGER
-    ----------------------------------------- */
+    /* TRIGGER */
 
     await ensureRepairReplacementTrigger(conn);
 
-    /* -----------------------------------------
-       VERIFY FINAL SCHEMA
-    ----------------------------------------- */
+    /* VERIFY */
 
     await verifySchema(conn);
 
-    /* -----------------------------------------
-       RESTORE FOREIGN KEY CHECKS
-    ----------------------------------------- */
+    /* FOREIGN KEY CHECKS ON */
 
     await conn.query(
-      `SET FOREIGN_KEY_CHECKS = 1`,
+      `SET FOREIGN_KEY_CHECKS = 1`
     );
 
     console.log(
-      "🔒 Foreign key checks re-enabled",
+      "🔒 Foreign key checks re-enabled"
     );
 
     console.log("");
-    console.log("========================================");
     console.log(
-      "✅ DATABASE INITIALIZATION COMPLETE",
+      "========================================"
     );
-    console.log("========================================");
+    console.log(
+      "✅ DATABASE INITIALIZATION COMPLETE"
+    );
+    console.log(
+      "========================================"
+    );
     console.log("");
 
     return true;
+
   } catch (err) {
     console.error("");
-    console.error("========================================");
     console.error(
-      "❌ DATABASE INITIALIZATION FAILED",
+      "========================================"
     );
-    console.error("========================================");
+    console.error(
+      "❌ DATABASE INITIALIZATION FAILED"
+    );
+    console.error(
+      "========================================"
+    );
+
     console.error(
       "Error:",
-      err.message,
+      err.message
     );
+
     console.error("");
 
     throw err;
+
   } finally {
     if (conn) {
       try {
         await conn.end();
 
         console.log(
-          "🔌 MySQL connection closed",
+          "🔌 MySQL connection closed"
         );
       } catch (closeErr) {
         console.warn(
           "⚠️ Could not close MySQL connection:",
-          closeErr.message,
+          closeErr.message
         );
       }
     }
