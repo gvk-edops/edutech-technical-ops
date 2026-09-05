@@ -66,14 +66,36 @@ async function autoInitialize() {
   if (cnt > 0) {
     console.log("✅ Database already initialised, skipping schema import");
     const alterations = [
-      { sql: "ALTER TABLE ram_specs DROP COLUMN brand", msg: "Removed RAM brand column" },
-      { sql: "ALTER TABLE ram_specs ADD COLUMN bus_speed_mhz INT NULL AFTER capacity_gb", msg: "Added RAM bus_speed_mhz column" },
-      { sql: "ALTER TABLE jobs ADD COLUMN required_date DATE NULL AFTER ram_capacity_gb", msg: "Added jobs required_date column" },
-      { sql: "ALTER TABLE inventory_ops MODIFY COLUMN status ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock'", msg: "Updated inventory_ops status ENUM" },
-      { sql: "ALTER TABLE inventory_rams MODIFY COLUMN status ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock'", msg: "Updated inventory_rams status ENUM" },
-      { sql: "ALTER TABLE inventory_storage MODIFY COLUMN status ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock'", msg: "Updated inventory_storage status ENUM" },
-      { sql: "ALTER TABLE inventory_network_cards MODIFY COLUMN status ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock'", msg: "Updated inventory_network_cards status ENUM" },
-      { sql: `CREATE TABLE IF NOT EXISTS technician_borrowings (
+      {
+        sql: "ALTER TABLE ram_specs DROP COLUMN brand",
+        msg: "Removed RAM brand column",
+      },
+      {
+        sql: "ALTER TABLE ram_specs ADD COLUMN bus_speed_mhz INT NULL AFTER capacity_gb",
+        msg: "Added RAM bus_speed_mhz column",
+      },
+      {
+        sql: "ALTER TABLE jobs ADD COLUMN required_date DATE NULL AFTER ram_capacity_gb",
+        msg: "Added jobs required_date column",
+      },
+      {
+        sql: "ALTER TABLE inventory_ops MODIFY COLUMN status ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock'",
+        msg: "Updated inventory_ops status ENUM",
+      },
+      {
+        sql: "ALTER TABLE inventory_rams MODIFY COLUMN status ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock'",
+        msg: "Updated inventory_rams status ENUM",
+      },
+      {
+        sql: "ALTER TABLE inventory_storage MODIFY COLUMN status ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock'",
+        msg: "Updated inventory_storage status ENUM",
+      },
+      {
+        sql: "ALTER TABLE inventory_network_cards MODIFY COLUMN status ENUM('in_stock','assigned','faulty','retired','reserved','borrowed') NOT NULL DEFAULT 'in_stock'",
+        msg: "Updated inventory_network_cards status ENUM",
+      },
+      {
+        sql: `CREATE TABLE IF NOT EXISTS technician_borrowings (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     technician_id INT UNSIGNED NOT NULL,
     component_type ENUM('ops', 'ram', 'storage', 'network_card') NOT NULL,
@@ -83,9 +105,15 @@ async function autoInitialize() {
     status ENUM('borrowed', 'returned', 'consumed') NOT NULL DEFAULT 'borrowed',
     notes TEXT NULL,
     CONSTRAINT fk_borrowings_technician FOREIGN KEY (technician_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB`, msg: "Created technician_borrowings table" },
-      { sql: "DROP TRIGGER IF EXISTS trg_repair_component_replacements_insert", msg: "Drop old trigger" },
-      { sql: `CREATE TRIGGER trg_repair_component_replacements_insert
+) ENGINE=InnoDB`,
+        msg: "Created technician_borrowings table",
+      },
+      {
+        sql: "DROP TRIGGER IF EXISTS trg_repair_component_replacements_insert",
+        msg: "Drop old trigger",
+      },
+      {
+        sql: `CREATE TRIGGER trg_repair_component_replacements_insert
       AFTER INSERT ON repair_component_replacements
       FOR EACH ROW
       BEGIN
@@ -123,16 +151,27 @@ async function autoInitialize() {
                 AND inventory_id = NEW.new_inventory_id 
                 AND status = 'borrowed';
           END IF;
-      END`, msg: "Create updated trigger" }
+      END`,
+        msg: "Create updated trigger",
+      },
     ];
     for (const { sql, msg } of alterations) {
       try {
         await conn.query(sql);
         console.log(`✅ ${msg}`);
       } catch (err) {
-        if (!err.message.includes("Can't DROP") && !err.message.includes("Duplicate column name")) throw err;
+        if (
+          !err.message.includes("Can't DROP") &&
+          !err.message.includes("Duplicate column name")
+        )
+          throw err;
       }
     }
+    const schema = fs.readFileSync(
+      path.join(__dirname, "smartboard_ops_management.sql"),
+      "utf8",
+    );
+    await ensureTriggers(conn, schema);
     await seedLocations(conn);
     await conn.query(
       "ALTER TABLE jobs MODIFY job_type ENUM('smartboard','ops','both') NOT NULL DEFAULT 'both'",
@@ -156,31 +195,16 @@ async function autoInitialize() {
 
   console.log("🔧 Initialising database schema...");
 
-  // 3. Read SQL and strip DELIMITER directives
-  //    mysql2 with multipleStatements handles BEGIN...END fine when we use ; as delimiter.
-  //    We just need to remove "DELIMITER //" and "DELIMITER ;" lines,
-  //    and replace the "//" end-of-body markers with ";".
+  // 3. Read SQL and preserve trigger bodies while parsing DELIMITER directives.
   const raw = fs.readFileSync(
     path.join(__dirname, "smartboard_ops_management.sql"),
     "utf8",
   );
 
-  const cleaned = raw
-    .replace(/^DELIMITER\s*\/\/\s*$/gm, "") // remove "DELIMITER //" lines
-    .replace(/^DELIMITER\s*;\s*$/gm, "") // remove "DELIMITER ;" lines
-    .replace(/^\/\/\s*$/gm, ";"); // replace standalone "//" lines with ";"
-
-  // 4. Execute everything in one shot (multipleStatements handles it)
-  try {
-    await conn.query(cleaned);
-  } catch (err) {
-    // Some drivers throw on the first error even with multipleStatements.
-    // Fall back to statement-by-statement execution.
-    console.warn(
-      "⚠️  Bulk execute failed, falling back to per-statement mode:",
-      err.message,
-    );
-    await runStatements(conn, cleaned);
+  // Execute one complete statement at a time. mysql2 does not process the
+  // mysql client DELIMITER command itself.
+  for (const statement of splitSqlStatements(raw)) {
+    await conn.query(statement);
   }
 
   console.log("✅ Database schema initialised successfully");
@@ -199,28 +223,39 @@ async function autoInitialize() {
   await conn.end();
 }
 
-async function runStatements(conn, sql) {
-  // Split on ; that are NOT inside a BEGIN...END block
-  // Simple approach: split on ";\n" and skip blanks/comments
-  const stmts = sql
-    .split(/;\s*\n/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith("--") && !s.startsWith("/*"));
+function splitSqlStatements(sql) {
+  const statements = [];
+  let delimiter = ";";
+  let buffer = [];
 
-  for (const stmt of stmts) {
-    try {
-      await conn.query(stmt);
-    } catch (err) {
-      if (
-        !err.message.includes("already exists") &&
-        !err.message.includes("Duplicate key name") &&
-        !err.message.includes("Duplicate entry")
-      ) {
-        console.warn(
-          `⚠️  [${stmt.substring(0, 80).replace(/\n/g, " ")}]: ${err.message}`,
-        );
-      }
+  for (const line of sql.split(/\r?\n/)) {
+    const delimiterMatch = line.match(/^\s*DELIMITER\s+(\S+)\s*$/i);
+    if (delimiterMatch) {
+      delimiter = delimiterMatch[1];
+      continue;
     }
+
+    buffer.push(line);
+    if (line.trimEnd().endsWith(delimiter)) {
+      const statement = buffer.join("\n").trim();
+      const withoutDelimiter = statement.slice(0, -delimiter.length).trim();
+      if (withoutDelimiter) statements.push(withoutDelimiter);
+      buffer = [];
+    }
+  }
+
+  const remainder = buffer.join("\n").trim();
+  if (remainder) statements.push(remainder);
+  return statements;
+}
+
+async function ensureTriggers(conn, schema) {
+  for (const statement of splitSqlStatements(schema)) {
+    const triggerMatch = statement.match(/CREATE\s+TRIGGER\s+`?([\w]+)`?/i);
+    if (!triggerMatch) continue;
+
+    await conn.query(`DROP TRIGGER IF EXISTS \`${triggerMatch[1]}\``);
+    await conn.query(statement);
   }
 }
 
