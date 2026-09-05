@@ -39,14 +39,23 @@ autoInitialize()
       await import("./routers/catalogs.route.js");
     const { default: clientRouter } = await import("./routers/client.route.js");
     const { default: jobRouter } = await import("./routers/job.route.js");
-    const { default: inventoryRouter } = await import("./routers/inventory.route.js");
-    const { default: assemblyRouter } = await import("./routers/assembly.route.js");
-    const { default: afterserviceRouter } = await import("./routers/afterservice.route.js");
-    const { default: deliveryRouter } = await import("./routers/delivery.route.js");
-    const { default: softwareKeysRouter } = await import("./routers/softwarekeys.route.js");
+    const { default: inventoryRouter } =
+      await import("./routers/inventory.route.js");
+    const { default: assemblyRouter } =
+      await import("./routers/assembly.route.js");
+    const { default: afterserviceRouter } =
+      await import("./routers/afterservice.route.js");
+    const { default: deliveryRouter } =
+      await import("./routers/delivery.route.js");
+    const { default: softwareKeysRouter } =
+      await import("./routers/softwarekeys.route.js");
     const { default: auditRouter } = await import("./routers/audit.route.js");
-    const { default: reportsRouter } = await import("./routers/reports.route.js");
-    const { default: borrowingsRouter } = await import("./routers/borrowings.route.js");
+    const { default: reportsRouter } =
+      await import("./routers/reports.route.js");
+    const { default: borrowingsRouter } =
+      await import("./routers/borrowings.route.js");
+    const { default: dashboardRouter } =
+      await import("./routers/dashboard.Route.js");
     app.use("/auth", authRouter);
     app.use("/settings", settingsRouter);
     app.use("/catalogs", catalogsRouter);
@@ -60,6 +69,7 @@ autoInitialize()
     app.use("/afterservice", afterserviceRouter);
     app.use("/reports", reportsRouter);
     app.use("/borrowings", borrowingsRouter);
+    app.use("/dashboard", dashboardRouter);
     // TODO: mount as implemented
     // app.use('/clients',       clientsRouter);
     // app.use('/inventory',     inventoryRouter);
