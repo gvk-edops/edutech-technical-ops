@@ -76,7 +76,8 @@ export const logout = (req, res) => {
   return res.json({ Status: true });
 };
 
-export const me = (req, res) => res.json({ Status: true, user: req.user });
+export const me = (req, res) =>
+  res.json(req.user ? { Status: true, user: req.user } : { Status: false });
 
 // ── User Management (admin only) ────────────────────
 
@@ -95,19 +96,15 @@ export const createUser = async (req, res) => {
   try {
     const { username, full_name, email, role, password } = req.body;
     if (!username || !full_name || !role || !password)
-      return res
-        .status(400)
-        .json({
-          Status: false,
-          Error: "username, full_name, role and password are required",
-        });
+      return res.status(400).json({
+        Status: false,
+        Error: "username, full_name, role and password are required",
+      });
     if (!["admin", "manager", "technician"].includes(role))
-      return res
-        .status(403)
-        .json({
-          Status: false,
-          Error: "This account role is managed by the developer",
-        });
+      return res.status(403).json({
+        Status: false,
+        Error: "This account role is managed by the developer",
+      });
 
     const [existing] = await pool.query(
       "SELECT id FROM users WHERE username = ?",
@@ -147,12 +144,10 @@ export const updateUser = async (req, res) => {
       [id],
     );
     if (!targetUser || targetUser.role === "auditor" || role === "auditor")
-      return res
-        .status(403)
-        .json({
-          Status: false,
-          Error: "This account role is managed by the developer",
-        });
+      return res.status(403).json({
+        Status: false,
+        Error: "This account role is managed by the developer",
+      });
 
     // Prevent admin from deactivating themselves
     if (req.user.id === parseInt(id) && is_active === 0)
@@ -187,19 +182,15 @@ export const resetPassword = async (req, res) => {
       [id],
     );
     if (!targetUser || targetUser.role === "auditor")
-      return res
-        .status(403)
-        .json({
-          Status: false,
-          Error: "This account role is managed by the developer",
-        });
+      return res.status(403).json({
+        Status: false,
+        Error: "This account role is managed by the developer",
+      });
     if (!password || password.length < 6)
-      return res
-        .status(400)
-        .json({
-          Status: false,
-          Error: "Password must be at least 6 characters",
-        });
+      return res.status(400).json({
+        Status: false,
+        Error: "Password must be at least 6 characters",
+      });
 
     const hash = await bcrypt.hash(password, 10);
     await pool.query("UPDATE users SET password_hash = ? WHERE id = ?", [
@@ -266,12 +257,10 @@ export const deleteUser = async (req, res) => {
       [id],
     );
     if (!targetUser || targetUser.role === "auditor")
-      return res
-        .status(403)
-        .json({
-          Status: false,
-          Error: "This account role is managed by the developer",
-        });
+      return res.status(403).json({
+        Status: false,
+        Error: "This account role is managed by the developer",
+      });
     if (req.user.id === parseInt(id))
       return res
         .status(400)

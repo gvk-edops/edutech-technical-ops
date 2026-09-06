@@ -17,6 +17,18 @@ export const verifyToken = (req, res, next) => {
   });
 };
 
+// Session probes may be called while a user is logging out, so report an
+// unauthenticated session without turning it into an API error.
+export const optionalToken = (req, res, next) => {
+  const token = req.cookies.token;
+  if (!token) return next();
+
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (!err) req.user = decoded;
+    next();
+  });
+};
+
 // Role-specific guards (each also runs verifyToken)
 const requireRole = (...roles) => [
   verifyToken,
