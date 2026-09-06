@@ -9,6 +9,7 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "8h";
 
 export const login = async (req, res) => {
   try {
+    res.set("Cache-Control", "no-store");
     const { username, password } = req.body;
     if (!username || !password)
       return res
@@ -65,6 +66,7 @@ export const login = async (req, res) => {
 };
 
 export const logout = (req, res) => {
+  res.set("Cache-Control", "no-store");
   if (req.user) {
     void logAction({
       userId: req.user.id,
@@ -79,7 +81,9 @@ export const logout = (req, res) => {
 };
 
 export const me = (req, res) =>
-  res.json(req.user ? { Status: true, user: req.user } : { Status: false });
+  res
+    .set("Cache-Control", "no-store")
+    .json(req.user ? { Status: true, user: req.user } : { Status: false });
 
 // ── User Management (admin only) ────────────────────
 
