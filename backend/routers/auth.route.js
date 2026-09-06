@@ -15,7 +15,7 @@ import { verifyToken, verifyAdmin, optionalToken } from "../middleware/auth.js";
 const router = express.Router();
 
 router.post("/login", login);
-router.post("/logout", verifyToken, logout);
+router.post("/logout", optionalToken, logout);
 router.get("/me", optionalToken, me);
 router.put("/change-password", verifyToken, changeOwnPassword);
 
