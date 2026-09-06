@@ -305,11 +305,17 @@ export default function PreferencesSettings() {
               <Accessibility className="h-5 w-5" /> Accessibility
             </CardTitle>
             <CardDescription>
-              Enable features for better usability
+              Enable features for better usability, including the floating
+              accessibility controls
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-1">
             {[
+              {
+                key: "showAccessibilityWidget",
+                label: "Floating Accessibility Widget",
+                desc: "Show the accessibility button on every screen",
+              },
               {
                 key: "highContrast",
                 label: "High Contrast",
