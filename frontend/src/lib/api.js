@@ -3,11 +3,13 @@
 
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
 
-export const API_URL = configuredApiUrl
-  ? /^https?:\/\//i.test(configuredApiUrl)
-    ? configuredApiUrl.replace(/\/$/, "")
-    : `https://${configuredApiUrl}`
-  : "http://localhost:3000";
+export const API_URL = import.meta.env.PROD
+  ? "/api"
+  : configuredApiUrl
+    ? /^https?:\/\//i.test(configuredApiUrl)
+      ? configuredApiUrl.replace(/\/$/, "")
+      : `https://${configuredApiUrl}`
+    : "http://localhost:3000";
 
 // Helper function to build full API endpoint URLs
 export const apiUrl = (endpoint) => {
