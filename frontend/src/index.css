@@ -204,7 +204,7 @@
   #invoice-print-root {
     display: block !important;
     width: 72mm;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: "Courier New", Courier, monospace;
     font-size: 11px;
     color: #000;
     background: #fff;
@@ -225,7 +225,7 @@
 }
 
 .invoice-receipt {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: "Courier New", Courier, monospace;
   font-size: 11px;
   color: #000;
 }

@@ -14,7 +14,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { User, Settings, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { HelpCircle, Timer, User, Settings, LogOut } from "lucide-react";
+import SupportFeedbackDialog from "./SupportFeedbackDialog";
 import axios from "@/utils/axios";
 import { toast } from "sonner";
 
@@ -40,10 +42,27 @@ const sectionTitle = (path) => {
   return "Dashboard";
 };
 
+const TRIAL_EXPIRES_ON = "2026-09-29";
+
+const getTrialDaysRemaining = () => {
+  const [expiryYear, expiryMonth, expiryDay] =
+    TRIAL_EXPIRES_ON.split("-").map(Number);
+  const today = new Date();
+  const todayUtc = Date.UTC(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  const expiryUtc = Date.UTC(expiryYear, expiryMonth - 1, expiryDay);
+  return Math.max(0, Math.round((expiryUtc - todayUtc) / 86400000));
+};
+
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState({ full_name: "", role: "" });
+  const [supportOpen, setSupportOpen] = useState(false);
+  const trialDaysRemaining = getTrialDaysRemaining();
 
   useEffect(() => {
     axios
@@ -84,6 +103,43 @@ export default function Header() {
 
       <div className="flex items-center gap-3 ml-4">
         <ThemeToggle />
+        <div className="group relative hidden sm:block">
+          <button
+            type="button"
+            className="flex h-9 items-center gap-2 rounded-full border border-orange-300/80 bg-orange-50 px-3 text-xs font-bold text-orange-800 shadow-[0_0_16px_rgba(249,115,22,0.25)] transition-all hover:bg-orange-100 hover:shadow-[0_0_22px_rgba(249,115,22,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 dark:border-orange-400/40 dark:bg-orange-950/40 dark:text-orange-200 dark:hover:bg-orange-900/60"
+            aria-label={`Trial plan: ${trialDaysRemaining} days remaining`}
+          >
+            <Timer className="h-4 w-4" />
+            <span>{trialDaysRemaining} days remaining</span>
+          </button>
+          <div className="pointer-events-none invisible absolute right-0 top-full z-50 mt-3 w-80 translate-y-1 rounded-xl border border-border bg-popover p-4 text-popover-foreground opacity-0 shadow-xl transition-all group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
+            <p className="font-semibold">Limited Trial Plan</p>
+            <p className="mt-1 text-sm leading-5 text-muted-foreground">
+              Your trial expires in {trialDaysRemaining} days or when you are
+              out of credits. Upgrade to keep your services online.
+            </p>
+            <a
+              href="https://railway.com/pricing"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              Upgrade
+            </a>
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          className="h-9 rounded-full border border-amber-300/80 bg-amber-50 px-3 text-amber-800 shadow-[0_0_18px_rgba(245,158,11,0.35)] transition-all hover:bg-amber-100 hover:text-amber-950 hover:shadow-[0_0_24px_rgba(245,158,11,0.55)] dark:border-amber-400/40 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/60 dark:hover:text-amber-100"
+          aria-label="Report a problem or send feedback"
+          title="Any problem? Send feedback"
+          onClick={() => setSupportOpen(true)}
+        >
+          <HelpCircle className="h-5 w-5 shrink-0" />
+          <span className="ml-2 text-xs font-bold sm:text-sm">
+            Any problem?
+          </span>
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-3 hover:opacity-80 transition-opacity focus:outline-none">
@@ -137,6 +193,8 @@ export default function Header() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <SupportFeedbackDialog open={supportOpen} onOpenChange={setSupportOpen} />
     </header>
   );
 }

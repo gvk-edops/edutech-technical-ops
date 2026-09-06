@@ -17,6 +17,7 @@ import Users from "./components/Users";
 import Reports from "./components/Reports";
 import Lending from "./components/Lending";
 import RoleRoute from "./components/RoleRoute";
+import { AccessibilityWidget } from "./components/AccessibilityWidget";
 
 const operationsRoles = ["admin", "manager"];
 const assemblyRoles = ["admin", "manager", "technician"];
@@ -131,6 +132,7 @@ function App() {
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
       <Toaster position="top-right" richColors />
+      <AccessibilityWidget />
     </>
   );
 }
