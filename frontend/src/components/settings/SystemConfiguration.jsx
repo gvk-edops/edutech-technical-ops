@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -1102,6 +1103,63 @@ function StorageCatalogSection() {
 }
 
 // ── Main component ────────────────────────────────────
+function ServerAuditVisibility() {
+  const [enabled, setEnabled] = useState(true);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    axios
+      .get(`${API_URL}/settings/system`)
+      .then(({ data }) => {
+        setEnabled(data.data?.audit_activity_visibility !== "0");
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const update = async (value) => {
+    setEnabled(value);
+    try {
+      await axios.put(`${API_URL}/settings/system`, {
+        settings: { audit_activity_visibility: value ? "1" : "0" },
+      });
+      toast.success(
+        `Auditor activity visibility ${value ? "enabled" : "disabled"}`,
+      );
+    } catch (error) {
+      setEnabled(!value);
+      toast.error(
+        error.response?.data?.message || "Could not update server setting",
+      );
+    }
+  };
+
+  return (
+    <Card className="mb-4 border-amber-200 bg-amber-50/40 dark:border-amber-900 dark:bg-amber-950/20">
+      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-semibold">Auditor activity visibility</p>
+          <p className="text-sm text-muted-foreground">
+            Server-level control for audit logs, activity statistics, and
+            performance metrics.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Badge variant={enabled ? "default" : "secondary"}>
+            {enabled ? "Visible" : "Hidden"}
+          </Badge>
+          <Switch
+            checked={enabled}
+            disabled={loading}
+            onCheckedChange={update}
+            aria-label="Toggle auditor activity visibility"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SystemConfiguration() {
   const navigate = useNavigate();
 
@@ -1117,6 +1175,8 @@ export default function SystemConfiguration() {
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
       </div>
+
+      <ServerAuditVisibility />
 
       <Tabs defaultValue="smartboards">
         <TabsList className="mb-4 flex-wrap h-auto gap-1">

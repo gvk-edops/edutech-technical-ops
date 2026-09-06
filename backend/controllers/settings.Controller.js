@@ -15,7 +15,8 @@ const SEED_SQL = `
 INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
   ('system_name', 'Smartboard OPS Management'),
   ('system_logo_url', NULL),
-  ('primary_color', '#0ea5e9');
+  ('primary_color', '#0ea5e9'),
+  ('audit_activity_visibility', '1');
 `;
 
 const ensureTable = async () => {
