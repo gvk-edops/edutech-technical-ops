@@ -8,7 +8,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const corsOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(",").map((s) => s.trim())
+  ? process.env.CORS_ORIGINS.split(",")
+      .map((s) => s.trim().replace(/\/+$/, ""))
+      .filter(Boolean)
   : ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"];
 
 app.use(
