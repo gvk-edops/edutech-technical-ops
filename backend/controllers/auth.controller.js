@@ -65,13 +65,15 @@ export const login = async (req, res) => {
 };
 
 export const logout = (req, res) => {
-  void logAction({
-    userId: req.user?.id,
-    action: "auth.logout",
-    entityType: "user",
-    entityId: req.user?.id,
-    req,
-  });
+  if (req.user) {
+    void logAction({
+      userId: req.user.id,
+      action: "auth.logout",
+      entityType: "user",
+      entityId: req.user.id,
+      req,
+    });
+  }
   res.clearCookie("token", { httpOnly: true, secure: true, sameSite: "none" });
   return res.json({ Status: true });
 };
